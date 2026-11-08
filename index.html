@@ -295,21 +295,7 @@ button:active,.btn:active,.hud-btn:active{transform:translateY(1px) scale(.985)}
 @media(max-width:700px){#gameCanvas{filter:saturate(1.045) contrast(1.018)}}
 </style>
 
-<style>
-#afDiagPanel{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:99999;max-height:48vh;overflow:auto;background:rgba(8,25,42,.94);color:#eef8ff;border:1px solid #8eb9d5;border-radius:14px;box-shadow:0 8px 28px #06182b88;font:12px/1.35 system-ui,Arial;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-.afdiag-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:#173b56;border-radius:13px 13px 0 0;font-size:13px}
-#afDiagPanel button{border:1px solid #8cb5cf;border-radius:8px;padding:5px 9px;background:#244d68;color:#fff;font-weight:700}
-.afdiag-body{padding:8px 10px 10px}
-.afdiag-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-.afdiag-grid>div{min-width:0;background:#ffffff12;border-radius:7px;padding:5px 7px}
-.afdiag-grid small{display:block;color:#9fc8dc;font-size:10px}
-.afdiag-grid span{display:block;overflow-wrap:anywhere;font-weight:650}
-.afdiag-events{margin-top:8px;border-top:1px solid #ffffff2b;padding-top:6px}
-.afdiag-events p{margin:4px 0;overflow-wrap:anywhere}
-.afdiag-events p.error{color:#ff9d9d}.afdiag-events p.warn{color:#ffdc8a}.afdiag-events p.info{color:#c7e7ff}
-.afdiag-actions{display:flex;gap:7px;margin-top:8px}
-@media(min-width:700px){#afDiagPanel{left:14px;right:auto;width:430px;max-height:55vh}}
-</style>
+
 
 <style id="af-hd-polish">
 #afGameCanvas{image-rendering:auto;transform:translateZ(0);backface-visibility:hidden}
@@ -320,56 +306,9 @@ button,.hud-panel,.glass-panel{ -webkit-font-smoothing:antialiased}
 <body>
 
 <script>
-// v9.8 LIVE DIAGNOSTICS: compact on-screen status, error capture and renderer telemetry.
-(function(){
- const state={events:[],last:'Menyiapkan diagnostik...',errors:0,started:Date.now(),visible:true};
- const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- function add(msg,type='info'){
-  const item={time:new Date().toLocaleTimeString('id-ID'),msg:String(msg),type};
-  state.events.unshift(item);state.events=state.events.slice(0,12);state.last=item.msg;
-  if(type==='error'||type==='warn')state.errors++;
-  render();
- }
- function render(){
-  const p=document.getElementById('afDiagPanel');if(!p)return;
-  const snap=window.__afDiagSnapshot||{};
-  const rows=[
-   ['Status',state.last],
-   ['Browser',navigator.userAgent.includes('Android')?'Android / Chrome atau browser berbasis Chromium':navigator.userAgent.slice(0,48)],
-   ['Layar',`${innerWidth} × ${innerHeight} · DPR ${devicePixelRatio||1}`],
-   ['Kanvas',snap.canvas||'menunggu renderer'],
-   ['WebGL',snap.webgl||'memeriksa...'],
-   ['Frame',snap.frames??'menunggu...'],
-   ['Objek 3D',snap.objects??'menunggu...'],
-   ['Segitiga',snap.triangles??'menunggu...'],
-   ['Kamera',snap.camera||'menunggu...'],
-   ['Pemain',snap.player||'menunggu...']
-  ];
-  p.innerHTML=`<div class="afdiag-head"><b>🛠 DIAGNOSTIK AL FAJAR</b><button id="afDiagMin" type="button">${state.visible?'Tutup':'Buka'}</button></div>
-  <div class="afdiag-body" style="display:${state.visible?'block':'none'}">
-  <div class="afdiag-grid">${rows.map(([k,v])=>`<div><small>${esc(k)}</small><span>${esc(v)}</span></div>`).join('')}</div>
-  <div class="afdiag-events"><b>Log terbaru</b>${state.events.slice(0,6).map(e=>`<p class="${e.type}"><small>${esc(e.time)}</small> ${esc(e.msg)}</p>`).join('')||'<p>Belum ada pesan.</p>'}</div>
-  <div class="afdiag-actions"><button id="afDiagCopy" type="button">Salin laporan</button><button id="afDiagClear" type="button">Bersihkan log</button></div></div>`;
-  p.querySelector('#afDiagMin')?.addEventListener('click',()=>{state.visible=!state.visible;render();});
-  p.querySelector('#afDiagCopy')?.addEventListener('click',()=>{
-   const report={userAgent:navigator.userAgent,viewport:[innerWidth,innerHeight],devicePixelRatio,errors:state.errors,events:state.events,snapshot:window.__afDiagSnapshot||{}};
-   const txt=JSON.stringify(report,null,2);
-   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(txt).then(()=>add('Laporan diagnostik disalin.')).catch(()=>add(txt,'warn'));
-   else add(txt,'warn');
-  });
-  p.querySelector('#afDiagClear')?.addEventListener('click',()=>{state.events=[];state.errors=0;add('Log dibersihkan.');});
- }
- function mount(){
-  if(document.getElementById('afDiagPanel'))return;
-  const p=document.createElement('section');p.id='afDiagPanel';document.body.appendChild(p);render();
- }
- window.__afDiag=add;window.__afDiagReady=true;window.__afDiagRender=render;
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
- window.addEventListener('error',e=>add(`${e.message||'JavaScript error'} (${e.filename||'inline'}:${e.lineno||0}:${e.colno||0})`,'error'));
- window.addEventListener('unhandledrejection',e=>add(`Promise ditolak: ${e.reason?.message||e.reason||'unknown'}`,'error'));
- window.addEventListener('online',()=>add('Koneksi internet kembali aktif.'));
- window.addEventListener('offline',()=>add('Perangkat sedang offline.','warn'));
-})();
+// Release build: diagnostic panel disabled; retain a harmless compatibility hook.
+window.__afDiag=window.__afDiag||function(){};
+window.__afDiagReady=true;
 </script>
 
 <div id="game"></div>
@@ -1552,20 +1491,40 @@ function trafficLight(x,z,rot=0){
 trafficLight(9,9,0);trafficLight(-9,-9,Math.PI);
 function makeCar(x,z,color,rot=0){
  const g=group(scene,x,0,z);g.rotation.y=rot;
- box(g,3.5,.85,1.8,mat(color),0,.8,0);
- box(g,1.9,.85,1.55,M.glass,0,1.55,-.05);
+ const bodyMat=mat(color,.58,.08);
+ const windowMat=new THREE.MeshStandardMaterial({color:0x8bc9df,roughness:.18,metalness:.12,transparent:true,opacity:.82});
+ const trimMat=mat(0x263b4d,.48,.18);
+ const chromeMat=mat(0xb8cbd4,.3,.72);
+ // Layered blocky body with a slightly raised cabin: clean Roblox-modern proportions.
+ box(g,3.5,.85,1.8,bodyMat,0,.8,0);
+ box(g,1.9,.85,1.55,windowMat,0,1.55,-.05);
+ box(g,1.92,.09,1.62,bodyMat,0,1.99,-.05);
+ // Window pillars, side window divisions, door seams and handles.
+ for(const side of [-1,1]){
+  box(g,.09,.72,.08,trimMat,-.91,1.56,side*.755);
+  box(g,.09,.72,.08,trimMat,.91,1.56,side*.755);
+  box(g,.055,.66,.025,trimMat,0,1.57,side*.79);
+  box(g,.78,.035,.035,trimMat,-.42,1.17,side*.91);
+  box(g,.78,.035,.035,trimMat,.48,1.17,side*.91);
+  box(g,.22,.055,.045,chromeMat,.42,1.22,side*.925);
+  box(g,.12,.09,.08,bodyMat,1.68,1.37,side*.88);
+  box(g,.12,.07,.08,chromeMat,1.68,1.4,side*.94);
+ }
  const wheelPivots=[];
- // The axle must cross the car's WIDTH (local Z), not its length (local X).
- // A pivot carries rolling rotation while the cylinder child keeps its axle orientation fixed.
+ // Axles cross the vehicle width; layered hubs stay attached while wheels roll.
  for(const xx of [-1.15,1.15])for(const zz of [-.9,.9]){
   const pivot=group(g,xx,.48,zz);
   const tire=cylinder(pivot,.42,.42,.22,M.dark,0,0,0,16);
   tire.rotation.x=Math.PI/2;
+  const rim=cylinder(pivot,.235,.235,.235,chromeMat,0,0,0,16);
+  rim.rotation.x=Math.PI/2;
+  const hub=cylinder(pivot,.105,.105,.245,mat(0x526b7a,.35,.65),0,0,0,12);
+  hub.rotation.x=Math.PI/2;
   wheelPivots.push(pivot);
  }
  g.userData.wheels=wheelPivots;
  box(g,.2,.2,.08,M.yellow,-1.78,1,.55);box(g,.2,.2,.08,M.red,1.78,1,.55);
- // v10.8 vehicle finish: layered bumpers, grille, mirrors, lamps and roof rails.
+ // v12.1 vehicle finish: layered bumpers, grille, lamps and mirrors.
  box(g,3.38,.16,.12,mat(0x34495a),0,.48,.91);
  box(g,3.38,.16,.12,mat(0x34495a),0,.48,-.91);
  box(g,.72,.22,.035,mat(0x253b4b),0,.88,.925);
@@ -1959,7 +1918,13 @@ box(head,.32,.09,.035,mat(0x6b4030),0,.34,.414);
 const hairFront=box(head,.5,.16,.16,mat(0x4a3028),-.13,.38,.37);
 hairFront.rotation.z=-.12;
 box(body,.2,.32,.08,M.gold,.32,1.82,.35);
-
+// v12.1 avatar polish: compact streetwear pocket tabs and sneaker toe accents.
+for(const side of [-1,1]){
+ box(body,.22,.2,.045,mat(0x2d6fa5),side*.3,1.55,.323);
+ box(body,.24,.055,.035,trimPlayer,side*.3,1.44,.35);
+ const shoeLeg=side<0?legL:legR;
+ box(shoeLeg,.34,.09,.045,mat(0x91c9e4),0,-.88,.485,{cast:false});
+}
 cap.visible=false;glasses.visible=false;backpack.visible=true;
 const avatarState={gender:'Laki-laki',skin:0xd99b72,hair:0x3c2d28,outfit:0x347fca,wear:'Tas'};
 try{Object.assign(avatarState,JSON.parse(localStorage.getItem('alfajar_avatar_v21')||'{}'));}catch(e){}
