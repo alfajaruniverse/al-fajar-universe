@@ -454,6 +454,15 @@ window.__afDiagReady=true;
 </div>
 
 
+
+<div id="audioSettings" class="hidden fixed z-[120] right-4 bottom-24 sm:bottom-6 w-[min(330px,calc(100vw-32px))] glass rounded-2xl p-4 text-white shadow-2xl border border-white/20">
+ <div class="flex items-center justify-between mb-3"><b class="text-sm"><i class="fa-solid fa-headphones mr-2 text-amber-300"></i>PENGATURAN AUDIO</b><button id="audioPanelClose" class="text-white/70 text-lg">×</button></div>
+ <div class="flex items-center justify-between text-xs font-bold mb-2"><span>Suara game</span><button id="audioMasterToggle" class="rounded-full px-3 py-1 bg-emerald-500">AKTIF</button></div>
+ <label class="block text-xs font-semibold mt-3">Musik latar <span id="musicVolumeLabel" class="float-right">35%</span></label><input id="musicVolume" type="range" min="0" max="100" value="35" class="w-full accent-amber-400">
+ <label class="block text-xs font-semibold mt-3">Efek suara <span id="sfxVolumeLabel" class="float-right">70%</span></label><input id="sfxVolume" type="range" min="0" max="100" value="70" class="w-full accent-amber-400">
+ <p class="text-[10px] text-white/65 mt-3 leading-relaxed">Musik instrumental dibuat langsung oleh game. Audio mulai setelah kamu menyentuh layar.</p>
+</div>
+
 <script>
 (function(){
  function enterFallback(mode){
@@ -2999,6 +3008,69 @@ const camTarget=new THREE.Vector3();
 let keys={},joy={x:0,y:0,active:false},running=false,jumpVelocity=0,onGround=true;
 let playerSitting=false;
 let soundOn=true, quality='high', xp=0,coins=0,bookCount=0,nearTarget=null,schoolVisited=false,guideVisited=false,emoteUntil=0,playerLevel=1,activeEmote='wave';
+let audioCtx=null,audioMaster=null,musicBus=null,sfxBus=null,musicTimer=null,musicStep=0,musicVolume=.35,sfxVolume=.70,footstepClock=0,audioGestureReady=false;
+try{const ap=JSON.parse(localStorage.getItem('alfajar_audio_v13')||'{}');soundOn=ap.enabled!==false;musicVolume=Math.max(0,Math.min(1,Number(ap.music??.35)));sfxVolume=Math.max(0,Math.min(1,Number(ap.sfx??.70)));}catch(e){}
+function saveAudioPrefs(){try{localStorage.setItem('alfajar_audio_v13',JSON.stringify({enabled:soundOn,music:musicVolume,sfx:sfxVolume}));}catch(e){}}
+function initAudio(){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;if(!audioCtx){audioCtx=new AC();audioMaster=audioCtx.createGain();musicBus=audioCtx.createGain();sfxBus=audioCtx.createGain();musicBus.connect(audioMaster);sfxBus.connect(audioMaster);audioMaster.connect(audioCtx.destination);}if(audioCtx.state==='suspended')audioCtx.resume();applyAudioVolumes();return true;}
+function applyAudioVolumes(){if(!audioCtx)return;const t=audioCtx.currentTime;audioMaster.gain.setTargetAtTime(soundOn?1:0,t,.06);musicBus.gain.setTargetAtTime(musicVolume,t,.08);sfxBus.gain.setTargetAtTime(sfxVolume,t,.04);}
+function audioTone(freq,duration=.14,type='sine',volume=.12,when=0,slide=0){if(!soundOn||!initAudio()||sfxVolume<=0)return;const t=audioCtx.currentTime+when,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t+duration);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),t+.018);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(sfxBus);o.start(t);o.stop(t+duration+.03);}
+function playGameSfx(kind){if(!soundOn)return;if(kind==='jump'){audioTone(260,.13,'triangle',.12,0,210);audioTone(470,.1,'sine',.06,.07);}else if(kind==='step')audioTone(125,.085,'triangle',.13,0,-38);else if(kind==='run')audioTone(145,.09,'triangle',.15,0,-45);else if(kind==='interact'){audioTone(620,.09,'sine',.16);audioTone(880,.12,'sine',.13,.055);}else if(kind==='correct')[523,659,784].forEach((f,i)=>audioTone(f,.22,'sine',.17,i*.09));else if(kind==='wrong'){audioTone(330,.20,'triangle',.15);audioTone(245,.24,'triangle',.13,.13);}else if(kind==='reward')[659,784,988].forEach((f,i)=>audioTone(f,.23,'sine',.17,i*.075));}
+
+// Original cheerful game theme: bright plucks, light bass and soft chord accents.
+const happyChords=[
+ {root:261.63,notes:[261.63,329.63,392.00,493.88]}, // C
+ {root:220.00,notes:[220.00,261.63,329.63,392.00]}, // Am
+ {root:174.61,notes:[174.61,220.00,261.63,329.63]}, // F
+ {root:196.00,notes:[196.00,246.94,293.66,392.00]}  // G
+];
+const happyMelody=[
+ 523.25,659.25,783.99,659.25,587.33,659.25,783.99,987.77,
+ 880.00,783.99,659.25,587.33,523.25,587.33,659.25,783.99,
+ 698.46,783.99,880.00,783.99,659.25,587.33,523.25,587.33,
+ 659.25,783.99,880.00,987.77,783.99,659.25,587.33,523.25
+];
+function musicPluck(freq,when=0,dur=.22,vol=.12){
+ if(!audioCtx||!musicBus||musicVolume<=0)return;
+ const t=audioCtx.currentTime+when,o=audioCtx.createOscillator(),g=audioCtx.createGain(),filter=audioCtx.createBiquadFilter();
+ o.type='triangle';o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(freq*.995,t+dur);
+ filter.type='lowpass';filter.frequency.setValueAtTime(2600,t);
+ g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ o.connect(filter);filter.connect(g);g.connect(musicBus);o.start(t);o.stop(t+dur+.02);
+}
+function musicPad(chord,when=0){
+ if(!audioCtx||!musicBus)return;
+ const t=audioCtx.currentTime+when;
+ chord.notes.slice(0,3).forEach((f,i)=>{
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),lp=audioCtx.createBiquadFilter();
+  o.type='sine';o.frequency.value=f/2;lp.type='lowpass';lp.frequency.value=750;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.025,t+.12);g.gain.linearRampToValueAtTime(.0001,t+.78);
+  o.connect(lp);lp.connect(g);g.connect(musicBus);o.start(t);o.stop(t+.8);
+ });
+}
+function musicBeat(){
+ if(!soundOn||!audioCtx||!musicBus)return;
+ const step=musicStep%32,chord=happyChords[Math.floor(step/8)%4],t=audioCtx.currentTime;
+ if(step%8===0)musicPad(chord);
+ // Bouncy melody with a little syncopation.
+ if(step%2===0)musicPluck(happyMelody[step],0,.24,.115);
+ if(step%4===2)musicPluck(happyMelody[(step+3)%32],.10,.16,.065);
+ // Soft bass pulse keeps the tune feeling playful without overpowering it.
+ if(step%4===0){
+  const b=audioCtx.createOscillator(),g=audioCtx.createGain();
+  b.type='triangle';b.frequency.setValueAtTime(chord.root/2,t);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.075,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+.28);
+  b.connect(g);g.connect(musicBus);b.start(t);b.stop(t+.3);
+ }
+ musicStep++;
+}
+function startGameMusic(){
+ if(!initAudio()||musicTimer||!soundOn)return;
+ musicStep=0;musicBeat();musicTimer=setInterval(musicBeat,320);
+}
+function stopGameMusic(){if(musicTimer){clearInterval(musicTimer);musicTimer=null;}}
+function syncAudioPanel(){const p=document.getElementById('audioSettings');if(!p)return;const b=document.getElementById('audioMasterToggle');b.textContent=soundOn?'AKTIF':'NONAKTIF';b.className='rounded-full px-3 py-1 '+(soundOn?'bg-emerald-500':'bg-slate-500');document.getElementById('musicVolume').value=Math.round(musicVolume*100);document.getElementById('sfxVolume').value=Math.round(sfxVolume*100);document.getElementById('musicVolumeLabel').textContent=Math.round(musicVolume*100)+'%';document.getElementById('sfxVolumeLabel').textContent=Math.round(sfxVolume*100)+'%';}
+
+
 try{const wallet=JSON.parse(localStorage.getItem('alfajar_wallet_v21')||'{}');xp=Number(wallet.xp)||0;coins=Number(wallet.coins)||0;playerLevel=Math.max(1,Number(wallet.level)||1);}catch(e){}
 function saveWallet(){try{localStorage.setItem('alfajar_wallet_v21',JSON.stringify({xp,coins,level:playerLevel}));}catch(e){}}
 function refreshWalletUI(){
@@ -3075,7 +3147,7 @@ function showRewardFx(label){
  requestAnimationFrame(()=>el.classList.add('visible'));
  setTimeout(()=>{el.classList.remove('visible');setTimeout(()=>el.remove(),350);},1250);
 }
-function addXP(v){
+function addXP(v){playGameSfx('reward');
  xp+=Math.max(0,Number(v)||0);coins+=Math.max(1,Math.floor(v/5));
  showRewardFx('+'+Math.max(0,Number(v)||0)+' XP');
  let gained=0;while(xp>=100){xp-=100;playerLevel++;gained++;}
@@ -3440,9 +3512,9 @@ function answerQuestion(value){
  const q=quizState.questions[quizState.index];
  const normalize=v=>String(v??'').trim().toLocaleLowerCase('id-ID');
  const correct=normalize(value)!=='__timeout__'&&normalize(value)===normalize(q.answer);
- if(correct){quizState.correct++;quizState.combo++;quizState.score+=10+Math.min(quizState.combo,5)*2;}
+ if(correct){playGameSfx('correct');quizState.correct++;quizState.combo++;quizState.score+=10+Math.min(quizState.combo,5)*2;}
  else{
-  quizState.combo=0;
+  playGameSfx('wrong');quizState.combo=0;
   tutorMistakes.push({student:studentProfile.name||'Pelajar',subject:quizState.subject,grade:quizState.grade,topic:topicOf(q),question:q.question,date:new Date().toISOString()});
   saveTutorMistakes();
  }
@@ -3744,24 +3816,7 @@ const schoolSchedule=[
  {time:'10.50–11.30',title:'Literasi',room:'Perpustakaan',kind:'reading'},
  {time:'11.30–12.00',title:'Refleksi & penutup',room:'Kelas Al Fajar',kind:'reflection'}
 ];
-function playSchoolBell(){
- if(!soundOn){showToast('Aktifkan suara untuk mendengar bel sekolah.');return;}
- try{
-  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
-  const ctx=new AC();
-  [880,660,880].forEach((freq,i)=>{
-   const osc=ctx.createOscillator(),gain=ctx.createGain();
-   osc.type='sine';osc.frequency.value=freq;
-   gain.gain.setValueAtTime(.0001,ctx.currentTime+i*.22);
-   gain.gain.exponentialRampToValueAtTime(.16,ctx.currentTime+i*.22+.025);
-   gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+i*.22+.18);
-   osc.connect(gain);gain.connect(ctx.destination);
-   osc.start(ctx.currentTime+i*.22);osc.stop(ctx.currentTime+i*.22+.2);
-  });
-  setTimeout(()=>ctx.close(),1200);
- }catch(e){showToast('Bel sekolah tidak dapat diputar di perangkat ini.');}
-}
-function openSchoolSchedule(){
+function playSchoolBell(){if(!soundOn){showToast('Aktifkan suara untuk mendengar bel sekolah.');return;}if(!initAudio())return;[880,660,880].forEach((f,i)=>audioTone(f,.2,'sine',.16,i*.22));} function openSchoolSchedule(){
  const rows=schoolSchedule.map((item,i)=>`<div class="flex gap-3 items-start rounded-xl p-3 ${i%2?'bg-white/5':'bg-white/10'}">
  <div class="min-w-24 text-amber-200 text-xs font-extrabold">${item.time}</div>
  <div class="flex-1"><b class="text-sm">${item.title}</b><div class="text-xs text-blue-100 mt-1">${item.room}</div></div></div>`).join('');
@@ -3803,8 +3858,13 @@ document.getElementById('qualityBtn').onclick=()=>{
  }
  showToast('Kualitas grafis: '+quality.toUpperCase());
 };
-document.getElementById('soundBtn').onclick=()=>{soundOn=!soundOn;document.getElementById('soundBtn').innerHTML=`<i class="fa-solid ${soundOn?'fa-volume-high':'fa-volume-xmark'}"></i>`;showToast(soundOn?'Suara aktif':'Suara dimatikan');};
 
+document.getElementById('soundBtn').onclick=()=>{const p=document.getElementById('audioSettings');p.classList.toggle('hidden');syncAudioPanel();if(!p.classList.contains('hidden'))initAudio();};
+document.getElementById('audioPanelClose').onclick=()=>document.getElementById('audioSettings').classList.add('hidden');
+document.getElementById('audioMasterToggle').onclick=()=>{soundOn=!soundOn;applyAudioVolumes();if(soundOn){initAudio();startGameMusic();}else stopGameMusic();saveAudioPrefs();syncAudioPanel();document.getElementById('soundBtn').innerHTML=`<i class="fa-solid ${soundOn?'fa-volume-high':'fa-volume-xmark'}"></i>`;};
+document.getElementById('musicVolume').oninput=e=>{musicVolume=Number(e.target.value)/100;applyAudioVolumes();if(musicVolume>0&&soundOn&&!musicTimer){const w=document.getElementById('welcomeScreen');if(!w||w.style.display==='none'||w.classList.contains('leaving'))startGameMusic();}saveAudioPrefs();syncAudioPanel();};
+document.getElementById('sfxVolume').oninput=e=>{sfxVolume=Number(e.target.value)/100;applyAudioVolumes();saveAudioPrefs();syncAudioPanel();};
+document.getElementById('soundBtn').innerHTML=`<i class="fa-solid ${soundOn?'fa-volume-high':'fa-volume-xmark'}"></i>`;
 const roomActivitySets={
  'Laboratorium IPA':[
   {q:'Apa langkah pertama sebelum melakukan pengamatan ilmiah?',o:['Mencatat kesimpulan','Menentukan pertanyaan atau tujuan','Mengabaikan hasil'],a:1,why:'Pengamatan dimulai dengan pertanyaan atau tujuan yang jelas.'},
@@ -3914,7 +3974,7 @@ function openLearningSimulation(){
  },0);
 }
 function interact(){
- if(!nearTarget){showToast('Dekati NPC atau bangunan untuk berinteraksi.');return;}
+ if(!nearTarget){showToast('Dekati NPC atau bangunan untuk berinteraksi.');return;}playGameSfx('interact');
  if(nearTarget.type==='exit'){leaveInterior();return;}
  if(nearTarget.type==='station'){
   const subject=currentInterior?.name||'Ruang Belajar';
@@ -4033,7 +4093,7 @@ function interact(){
 }
 document.getElementById('interactBtn').onclick=interact;
 document.getElementById('interactMobile').onclick=interact;
-document.getElementById('jumpBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(onGround){jumpVelocity=8.5;onGround=false;}});
+document.getElementById('jumpBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(onGround){jumpVelocity=8.5;onGround=false;playGameSfx('jump');}});
 document.getElementById('runBtn').addEventListener('pointerdown',e=>{e.preventDefault();running=true;});
 ['pointerup','pointercancel','pointerleave'].forEach(ev=>document.getElementById('runBtn').addEventListener(ev,()=>running=false));
 
@@ -4157,7 +4217,7 @@ function updatePlayer(dt){
  const nx=player.position.x+moveDir.x*speed*dt,nz=player.position.z+moveDir.z*speed*dt;
  if(!blocked(nx,player.position.z))player.position.x=nx;
  if(!blocked(player.position.x,nz))player.position.z=nz;
- if(moving){const target=Math.atan2(moveDir.x,moveDir.z);let diff=THREE.MathUtils.euclideanModulo(target-player.rotation.y+Math.PI,Math.PI*2)-Math.PI;player.rotation.y+=diff*Math.min(1,dt*12);}
+ if(moving){footstepClock+=dt;if(footstepClock>((running||keys.ShiftLeft||keys.ShiftRight)?0.30:0.48)){playGameSfx(running||keys.ShiftLeft||keys.ShiftRight?'run':'step');footstepClock=0;}}else footstepClock=0;if(moving){const target=Math.atan2(moveDir.x,moveDir.z);let diff=THREE.MathUtils.euclideanModulo(target-player.rotation.y+Math.PI,Math.PI*2)-Math.PI;player.rotation.y+=diff*Math.min(1,dt*12);}
  // jump and gravity
  jumpVelocity-=22*dt;player.position.y+=jumpVelocity*dt;
  if(player.position.y<=0){
@@ -4560,7 +4620,7 @@ function enterAlFajar(mode='play'){
  const gameMount=document.getElementById('game');
  if(gameMount){gameMount.style.visibility='visible';gameMount.style.display='block';}
  if(renderer&&renderer.domElement){renderer.domElement.style.visibility='visible';renderer.domElement.style.display='block';}
- if(welcome){welcome.classList.add('leaving');setTimeout(()=>{welcome.style.display='none';try{camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.render(scene,camera);}catch(e){console.warn('AL FAJAR start render:',e);}},760);}
+ if(welcome){welcome.classList.add('leaving');if(soundOn){initAudio();startGameMusic();}setTimeout(()=>{welcome.style.display='none';try{camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.render(scene,camera);}catch(e){console.warn('AL FAJAR start render:',e);}},760);}
  ['topHud','locationTag','miniMapWrap','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
  const hint=document.getElementById('desktopHint');if(hint)hint.style.display='';
  const loc=document.getElementById('locationTag');if(loc)loc.innerHTML=`<i class="fa-solid fa-location-dot text-amber-300 mr-1"></i> AL FAJAR CITY · ${selectedGrade}`;
