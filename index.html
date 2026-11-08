@@ -698,8 +698,8 @@ function makePedestrian(name,color,waypoints,phase=0){
  pedestrianNPCs.push(npc);
  return npc;
 }
-makePedestrian('PAK ARIF',0x3987bd,[[-16,-14],[-12,-18],[-7,-16],[-9,-11]],.3);
-makePedestrian('BU LINA',0xd9799b,[[16,14],[12,18],[7,16],[9,11]],1.1);
+makePedestrian('Pak Rochman',0x3987bd,[[-16,-14],[-12,-18],[-7,-16],[-9,-11]],.3);
+makePedestrian('Bu Tri',0xd9799b,[[16,14],[12,18],[7,16],[9,11]],1.1);
 makePedestrian('BIMA',0x45a77a,[[-34,-17],[-30,-20],[-27,-16],[-30,-12]],2.0);
 makePedestrian('SASKIA',0x9278d5,[[34,17],[30,20],[27,16],[30,12]],2.8);
 // v11.4 LIVING CITY: paired pedestrians share a short conversation stop.
@@ -1842,9 +1842,19 @@ box(body,.24,.28,.08,M.gold,0,1.63,-.53);
 
 const head=group(body,0,2.55,0);
 box(head,.86,.88,.78,skinMat,0,0,0);
-const hairMesh=box(head,.9,.22,.82,mat(0x3c2d28),0,.48,0); // hair cap
-box(head,.16,.42,.72,mat(0x3c2d28),-.39,.28,.02);
-box(head,.16,.42,.72,mat(0x3c2d28),.39,.28,.02);
+const hairMesh=box(head,.9,.22,.82,mat(0x3c2d28),0,.48,0); // short blocky hair cap
+const maleHairL=box(head,.16,.42,.72,mat(0x3c2d28),-.39,.28,.02);
+const maleHairR=box(head,.16,.42,.72,mat(0x3c2d28),.39,.28,.02);
+// Alternate long hairstyle used by the female avatar preset.
+const femaleHair=group(head,0,0,0);
+const femaleHairMat=mat(0x3c2d28,.82,0);
+const femaleHairBack=box(femaleHair,.92,1.28,.3,femaleHairMat,0,-.48,-.36);
+const femaleHairTop=box(femaleHair,.98,.22,.9,femaleHairMat,0,.47,0);
+// Long side locks are moved toward the face so the hairstyle reads clearly from the front camera.
+const femaleHairL=box(femaleHair,.24,1.18,.34,femaleHairMat,-.45,-.38,.27);
+const femaleHairR=box(femaleHair,.24,1.18,.34,femaleHairMat,.45,-.38,.27);
+const femaleFringe=box(femaleHair,.78,.22,.24,femaleHairMat,0,.34,.43);
+const femaleHairClip=box(femaleHair,.16,.1,.08,mat(0xf2c66d),.31,.25,.47);
 sphere(head,.09,skinMat,-.45,-.05,.02,8);sphere(head,.09,skinMat,.45,-.05,.02,8);
 
 box(head,.16,.12,.04,M.dark,-.2,.03,.405,{cast:false});box(head,.16,.12,.04,M.dark,.2,.03,.405,{cast:false});
@@ -1887,6 +1897,21 @@ box(body,.22,.28,.045,mat(0x547b9a),-.31,1.48,.31);
 box(body,.22,.28,.045,mat(0x547b9a),.31,1.48,.31);
 box(body,.08,.38,.045,trimPlayer,-.52,1.66,.28);
 box(body,.08,.38,.045,trimPlayer,.52,1.66,.28);
+// v12.6 gender preset: simple blocky skirt layer, hidden for the male preset.
+const femaleSkirt=group(body,0,1.02,0);
+const skirtMat=mat(0x347fca,.72,.04);
+box(femaleSkirt,.92,.22,.68,skirtMat,0,.02,0);
+box(femaleSkirt,1.08,.48,.76,skirtMat,0,-.29,0);
+box(femaleSkirt,1.1,.07,.78,mat(0xf2c66d),0,-.53,0);
+// Front pleat seams and a contrasting waist belt make the alternate outfit readable at game distance.
+for(const px of [-.25,0,.25]) box(femaleSkirt,.035,.36,.018,mat(0x9bc8e2),px,-.29,.392);
+box(femaleSkirt,1.12,.075,.045,mat(0xf2c66d),0,-.02,.39);
+femaleSkirt.visible=false;
+const maleJacket=group(body,0,1.65,.315);
+box(maleJacket,.09,1.02,.045,mat(0xf2c66d),0,0,.02);
+for(const px of [-.34,.34]) box(maleJacket,.24,.16,.04,mat(0x1d527c),px,.3,.025);
+maleJacket.visible=true;
+
 const backpack=group(body,0,1.75,-.42);
 box(backpack,.2,.5,.08,mat(0x765039),-.39,-.05,-.01);
 box(backpack,.2,.5,.08,mat(0x765039),.39,-.05,-.01);
@@ -1967,7 +1992,7 @@ box(npcBody,.12,.22,.68,npcHair,-.3,2.78,.02);
 box(npcBody,.12,.22,.68,npcHair,.3,2.78,.02);
 const npcPocket=box(npcBody,.22,.2,.045,mat(0x1b705d),.25,1.78,.29);
 box(npcBody,.08,.1,.025,M.gold,.25,1.8,.32);
-const npcLabel=makeLabel('PAK PANDU',0,3.6,0);npc.add(npcLabel);
+const npcLabel=makeLabel('Pak Dedi',0,3.6,0);npc.add(npcLabel);
 
 function makeLabel(text,x,y,z){
  const c=document.createElement('canvas');c.width=512;c.height=128;const q=c.getContext('2d');
@@ -2606,12 +2631,12 @@ function addVenueNPC(parent,name,shirt,x,z,pose,activity){
  record.homeY=0;
  return record;
 }
-const artMentor=addVenueNPC(artInterior,'Bu Maya',0xc77b70,-7.5,145.4,'standing','painting');
-const sportCoach=addVenueNPC(sportsInterior,'Pak Damar',0x3d9a78,-10.2,145.0,'standing','coaching');
-const museumGuide=addVenueNPC(museumInterior,'Bu Ratih',0xb58a55,9.5,145.0,'standing','guiding');
-const astroGuide=addVenueNPC(observatoryInterior,'Pak Naufal',0x6078b7,-9.5,145.0,'standing','observing');
+const artMentor=addVenueNPC(artInterior,'Bu Neneng',0xc77b70,-7.5,145.4,'standing','painting');
+const sportCoach=addVenueNPC(sportsInterior,'Bu Eri',0x3d9a78,-10.2,145.0,'standing','coaching');
+const museumGuide=addVenueNPC(museumInterior,'Pak Adit',0xb58a55,9.5,145.0,'standing','guiding');
+const astroGuide=addVenueNPC(observatoryInterior,'Pak Agung',0x6078b7,-9.5,145.0,'standing','observing');
 const cafeHost=addVenueNPC(cafeInterior,'Kak Sari',0xd58c68,-10.0,145.0,'standing','serving');
-const civicOfficer=addVenueNPC(civicInterior,'Pak Bima',0x4c83a0,10.0,145.0,'standing','helping');
+const civicOfficer=addVenueNPC(civicInterior,'Ms. Putri',0x4c83a0,10.0,145.0,'standing','helping');
 
 // Simple activity props placed beside each NPC, not blocking the central route.
 const artPalette=group(artInterior,-7.5,0,143.7);
@@ -2984,7 +3009,7 @@ function refreshWalletUI(){
 
 
 const questDefs=[
- {id:'guide',title:'Temui Pak Pandu',desc:'Sapa pemandu kota',goal:1,xp:20,coins:5},
+ {id:'guide',title:'Temui Pak Dedi',desc:'Sapa pemandu kota',goal:1,xp:20,coins:5},
  {id:'school',title:'Kunjungi sekolah',desc:'Masuk ke Sekolah Al Fajar',goal:1,xp:25,coins:6},
  {id:'books',title:'Pemburu pengetahuan',desc:'Kumpulkan 3 buku ilmu',goal:3,xp:30,coins:8},
  {id:'quiz',title:'Uji kemampuan',desc:'Selesaikan satu kuis',goal:1,xp:35,coins:10},
@@ -3558,11 +3583,25 @@ function classroomPanel(mode='student'){
 }
 
 function applyAvatarLook(){
+ const genderValue=String(avatarState.gender||'Laki-laki').trim().toLowerCase();
+ const isFemale=genderValue==='perempuan'||genderValue.includes('perempuan');
+ avatarState.gender=isFemale?'Perempuan':'Laki-laki';
  setMaterialColor(head.children[0],avatarState.skin);
  setMaterialColor(armL.children[1],avatarState.skin);setMaterialColor(armR.children[1],avatarState.skin);
- setMaterialColor(hairMesh,avatarState.hair);setMaterialColor(torso,avatarState.outfit);
+ setMaterialColor(hairMesh,avatarState.hair);
+ [maleHairL,maleHairR].forEach(m=>setMaterialColor(m,avatarState.hair));
+ [femaleHairBack,femaleHairTop,femaleHairL,femaleHairR,femaleFringe].forEach(m=>setMaterialColor(m,avatarState.hair));
+ // Toggle actual mesh groups for a clearly different silhouette.
+ femaleHair.visible=isFemale;
+ hairMesh.visible=!isFemale;
+ maleHairL.visible=!isFemale;maleHairR.visible=!isFemale;
+ if(typeof femaleSkirt!=='undefined')femaleSkirt.visible=isFemale;
+ if(typeof maleJacket!=='undefined')maleJacket.visible=!isFemale;
+ setMaterialColor(skirtMat,avatarState.outfit);
+ setMaterialColor(torso,avatarState.outfit);
  setMaterialColor(armL.children[0],avatarState.outfit);setMaterialColor(armR.children[0],avatarState.outfit);
- torso.scale.x=avatarState.gender==='Perempuan'?.94:1;
+ torso.scale.x=isFemale?.94:1;
+ torso.scale.y=isFemale?1.02:1;
  cap.visible=avatarState.wear==='Topi';glasses.visible=avatarState.wear==='Kacamata';backpack.visible=avatarState.wear==='Tas';
  try{localStorage.setItem('alfajar_avatar_v21',JSON.stringify(avatarState));}catch(e){}
 }
@@ -3638,6 +3677,9 @@ function avatarPanel(){
   const $=id=>document.getElementById(id);
   $('avGender').value=avatarState.gender;$('avSkin').value=avatarState.skin.toString(16).padStart(6,'0');
   $('avHair').value=avatarState.hair.toString(16).padStart(6,'0');$('avOutfit').value=avatarState.outfit.toString(16).padStart(6,'0');$('avWear').value=avatarState.wear;
+  const updateGenderPreview=()=>{avatarState.gender=$('avGender').value;applyAvatarLook();showToast('Model karakter diperbarui: '+avatarState.gender);};
+  $('avGender').addEventListener('change',updateGenderPreview);
+  $('avGender').addEventListener('input',updateGenderPreview);
   $('saveAvatar').onclick=()=>{
    avatarState.gender=$('avGender').value;avatarState.skin=parseInt($('avSkin').value,16);
    avatarState.hair=parseInt($('avHair').value,16);avatarState.outfit=parseInt($('avOutfit').value,16);avatarState.wear=$('avWear').value;
@@ -3689,7 +3731,7 @@ document.getElementById('dayBtn').onclick=()=>{
  document.getElementById('dayBtn').innerHTML=`<i class="fa-solid ${nightMode?'fa-sun':'fa-moon'}"></i>`;
  showToast(nightMode?'Mode malam aktif':'Mode siang aktif');
 };
-document.getElementById('helpBtn').onclick=()=>openModal(`<div class="brand text-2xl font-bold mb-2">PANDUAN PETUALANG</div><p class="text-blue-100 text-sm mb-4">Jelajahi Al Fajar City, temui Pak Pandu, masuki gedung sekolah, dan kumpulkan buku ilmu.</p><div class="grid grid-cols-2 gap-2 text-sm"><div class="bg-white/10 rounded-xl p-3"><b>Komputer</b><p class="text-blue-100 text-xs mt-1">WASD bergerak · Shift lari · Space lompat · E interaksi · drag mouse untuk kamera · G menyapa</p></div><div class="bg-white/10 rounded-xl p-3"><b>HP / Tablet</b><p class="text-blue-100 text-xs mt-1">Joystick kiri · geser layar kanan untuk kamera · tombol aksi di kanan</p></div></div><p class="text-xs text-amber-200 mt-4">Advanced Learning: jalur belajar per topik, tujuan pembelajaran, level kesulitan soal, dan koleksi lencana prestasi. Fitur v1.6 tetap tersedia.</p>`);
+document.getElementById('helpBtn').onclick=()=>openModal(`<div class="brand text-2xl font-bold mb-2">PANDUAN PETUALANG</div><p class="text-blue-100 text-sm mb-4">Jelajahi Al Fajar City, temui Pak Dedi, masuki gedung sekolah, dan kumpulkan buku ilmu.</p><div class="grid grid-cols-2 gap-2 text-sm"><div class="bg-white/10 rounded-xl p-3"><b>Komputer</b><p class="text-blue-100 text-xs mt-1">WASD bergerak · Shift lari · Space lompat · E interaksi · drag mouse untuk kamera · G menyapa</p></div><div class="bg-white/10 rounded-xl p-3"><b>HP / Tablet</b><p class="text-blue-100 text-xs mt-1">Joystick kiri · geser layar kanan untuk kamera · tombol aksi di kanan</p></div></div><p class="text-xs text-amber-200 mt-4">Advanced Learning: jalur belajar per topik, tujuan pembelajaran, level kesulitan soal, dan koleksi lencana prestasi. Fitur v1.6 tetap tersedia.</p>`);
 
 // SCHOOL DAY SYSTEM v4.4 — timetable, attendance and user-triggered school bell.
 const schoolSchedule=[
@@ -3932,8 +3974,8 @@ function interact(){
  if(nearTarget.type==='pedestrian'){
   const walkerName=nearTarget.name;
   const lines={
-   'PAK ARIF':'Saya sedang berkeliling kota. Coba kunjungi gedung-gedung belajar dan temukan hal baru!',
-   'BU LINA':'Perpustakaan adalah tempat yang menyenangkan untuk membaca dan menambah wawasan.',
+   'Pak Rochman':'Saya sedang berkeliling kota. Coba kunjungi gedung-gedung belajar dan temukan hal baru!',
+   'Bu Tri':'Perpustakaan adalah tempat yang menyenangkan untuk membaca dan menambah wawasan.',
    'BIMA':'Aku suka mengamati kendaraan dan bangunan. Kota ini penuh hal menarik!',
    'SASKIA':'Ayo belajar sambil menjelajah. Setiap gedung punya pengalaman berbeda.',
    'RAKA':'Aku dan Nisa sedang berbincang tentang tempat belajar favorit kami.',
@@ -3973,8 +4015,8 @@ function interact(){
  }
  if(nearTarget.type==='npc'){
   guideVisited=true;const guideMissionEl=document.getElementById('guideMission');if(guideMissionEl)guideMissionEl.textContent='Selesai ✓';questProgress('guide');
-  openModal(`<div class="flex items-center gap-3 mb-3"><div class="w-14 h-14 rounded-2xl bg-emerald-400 grid place-items-center text-2xl"><i class="fa-solid fa-person-chalkboard"></i></div><div><div class="brand text-2xl font-bold">Pak Pandu</div><div class="text-xs text-emerald-200">Pemandu Al Fajar City</div></div></div><p class="text-blue-50 mb-4">Halo, petualang! Selamat datang di Al Fajar City. Kamu bisa menjelajahi kota, masuk ke gedung sekolah, dan mengumpulkan buku ilmu. Coba kunjungi Sekolah Al Fajar di sebelah utara plaza!</p><button id="guideReward" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl px-4 py-3 w-full">Ambil hadiah +20 XP</button>`);
-  setTimeout(()=>{const b=document.getElementById('guideReward');if(b)b.onclick=()=>{addXP(20);closeModal();showToast('Terima kasih sudah menyapa Pak Pandu!');};},0);
+  openModal(`<div class="flex items-center gap-3 mb-3"><div class="w-14 h-14 rounded-2xl bg-emerald-400 grid place-items-center text-2xl"><i class="fa-solid fa-person-chalkboard"></i></div><div><div class="brand text-2xl font-bold">Pak Dedi</div><div class="text-xs text-emerald-200">Pemandu Al Fajar City</div></div></div><p class="text-blue-50 mb-4">Halo, petualang! Selamat datang di Al Fajar City. Kamu bisa menjelajahi kota, masuk ke gedung sekolah, dan mengumpulkan buku ilmu. Coba kunjungi Sekolah Al Fajar di sebelah utara plaza!</p><button id="guideReward" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl px-4 py-3 w-full">Ambil hadiah +20 XP</button>`);
+  setTimeout(()=>{const b=document.getElementById('guideReward');if(b)b.onclick=()=>{addXP(20);closeModal();showToast('Terima kasih sudah menyapa Pak Dedi!');};},0);
  }else{
   if(nearTarget.name==='Sekolah Al Fajar'){schoolVisited=true;const schoolMissionEl=document.getElementById('schoolMission');if(schoolMissionEl)schoolMissionEl.textContent='Selesai ✓';questProgress('school');}
   openModal(`<div class="brand text-2xl font-bold mb-1">${nearTarget.name}</div><p class="text-blue-100 text-sm mb-4">Selamat datang! Pilih aktivitas yang ingin kamu lakukan.</p><div class="grid grid-cols-2 gap-3"><button class="activity bg-indigo-500" data-a="masuk"><i class="fa-solid fa-door-open text-2xl mb-2"></i><b class="block">Masuk Gedung</b><small class="text-white/80">Jelajahi interior 3D</small></button><button class="activity bg-sky-500 hover:bg-sky-400 rounded-xl p-4 text-left" data-a="materi"><i class="fa-solid fa-book-open text-2xl mb-2"></i><b class="block">Pelajari Materi</b><small class="text-white/80">Baca materi</small></button><button class="activity bg-emerald-500 hover:bg-emerald-400 rounded-xl p-4 text-left" data-a="kuis"><i class="fa-solid fa-circle-question text-2xl mb-2"></i><b class="block">Mulai Kuis</b><small class="text-white/80">Uji pemahaman</small></button><button class="activity bg-violet-500 hover:bg-violet-400 rounded-xl p-4 text-left" data-a="tantangan"><i class="fa-solid fa-trophy text-2xl mb-2"></i><b class="block">Tantangan</b><small class="text-white/80">Segera hadir</small></button><button class="activity bg-amber-500 hover:bg-amber-400 rounded-xl p-4 text-left" data-a="pencapaian"><i class="fa-solid fa-medal text-2xl mb-2"></i><b class="block">Pencapaian</b><small class="text-white/80">Lihat progres</small></button></div>`);
@@ -4076,7 +4118,7 @@ function nearestInteraction(){
   if(d<3.5&&d<dist){best={type:'pedestrian',name:walker.root.userData.displayName||'Warga Kota',walker};dist=d;}
  }
  const dNpc=Math.hypot(player.position.x-npc.position.x,player.position.z-npc.position.z);
- if(dNpc<4.2){best={type:'npc',name:'Pak Pandu'};dist=dNpc;}
+ if(dNpc<4.2){best={type:'npc',name:'Pak Dedi'};dist=dNpc;}
  for(const b of buildings){
   const d=Math.hypot(player.position.x-b.x,player.position.z-b.z);
   if(d<Math.max(b.r,5)&&d<dist){best={type:'building',name:b.name};dist=d;}
@@ -4091,7 +4133,7 @@ function nearestInteraction(){
  }
  nearTarget=best;
  const el=document.getElementById('interaction'),mob=document.getElementById('interactMobile');
- if(best){el.classList.remove('hidden');document.getElementById('interactLabel').textContent='E · '+(best.type==='npc'?'BICARA DENGAN PAK PANDU':best.type==='student'?'SAPA '+best.name:best.type==='pedestrian'?'BICARA DENGAN '+best.name:best.type==='cityInfo'?'BACA '+best.name:best.type==='bench'?'DUDUK DI BANGKU':'MASUK '+best.name.toUpperCase());mob.style.display='grid';}
+ if(best){el.classList.remove('hidden');document.getElementById('interactLabel').textContent='E · '+(best.type==='npc'?'BICARA DENGAN Pak Dedi':best.type==='student'?'SAPA '+best.name:best.type==='pedestrian'?'BICARA DENGAN '+best.name:best.type==='cityInfo'?'BACA '+best.name:best.type==='bench'?'DUDUK DI BANGKU':'MASUK '+best.name.toUpperCase());mob.style.display='grid';}
  else{el.classList.add('hidden');mob.style.display='none';}
 }
 let wasAirborne=false;
@@ -4613,7 +4655,7 @@ addEventListener('resize',()=>{
  renderer.setSize(innerWidth,innerHeight,false);
  camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();
 });
-showToast('Selamat datang di Al Fajar City! Temui Pak Pandu.');
+showToast('Selamat datang di Al Fajar City! Temui Pak Dedi.');
 </script>
 </body>
 </html>
