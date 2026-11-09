@@ -302,6 +302,21 @@ button:active,.btn:active,.hud-btn:active{transform:translateY(1px) scale(.985)}
 #game{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
 button,.hud-panel,.glass-panel{ -webkit-font-smoothing:antialiased}
 </style>
+
+<style id="v16-3-character-modal-layer-fix">
+/* Modal onboarding harus berada di atas welcome screen (z-index welcome = 90). */
+#modal{z-index:200!important;position:fixed!important;inset:0!important;width:100vw;height:100dvh;overflow-y:auto;align-items:center;justify-content:center;padding:16px!important;background:rgba(3,12,28,.88)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#modal>div{position:relative;z-index:201;width:min(100%,720px);max-height:calc(100dvh - 32px);overflow-y:auto;margin:auto}
+#modalClose{z-index:5}
+@media(max-width:600px){
+ #modal{align-items:flex-start;padding:12px!important}
+ #modal>div{max-height:calc(100dvh - 24px);padding:16px!important;border-radius:20px!important}
+ #modalContent .max-w-xl{width:100%}
+ #modalContent .grid{gap:9px}
+ #modalContent input,#modalContent select{font-size:16px;min-height:42px}
+ #modalContent #creatorStart{position:sticky;bottom:0;z-index:3}
+}
+</style>
 </head>
 <body>
 
@@ -342,7 +357,14 @@ window.__afDiagReady=true;
      <button class="gradeWorldBtn rounded-xl p-3 font-black text-sm bg-white/15 border border-white/20" data-grade="SMP">📘<br>SMP</button>
      <button class="gradeWorldBtn rounded-xl p-3 font-black text-sm bg-white/15 border border-white/20" data-grade="SMA/SMK">🎓<br>SMA/SMK</button>
     </div>
-    <div id="selectedWorldLabel" class="text-xs font-extrabold text-emerald-200 mt-2">Dunia terpilih: SD</div>
+    <div id="selectedWorldLabel" class="text-xs font-extrabold text-emerald-200 mt-2">Dunia terpilih: SD · Kelas 3</div>
+    <div class="mt-3">
+     <label for="selectedClassInput" class="block text-xs font-extrabold text-blue-100 mb-1">PILIH KELAS</label>
+     <select id="selectedClassInput" class="w-full rounded-xl bg-slate-800/95 text-white border border-white/20 p-3 font-bold">
+      <option value="3">Kelas 3</option>
+     </select>
+     <p id="classAvailabilityNote" class="text-[11px] text-blue-100 mt-2">Bank soal tersedia akan disesuaikan dengan kelas pilihanmu.</p>
+    </div>
    </div>
    <div class="welcome-actions">
     <button type="button" onclick="window.enterAlFajar(\u0027play\u0027)" id="welcomePlay" class="welcome-primary">▶ Main Sekarang</button>
@@ -377,6 +399,7 @@ window.__afDiagReady=true;
     <button class="hud-btn nav-main" id="missionBtn" title="Misi" aria-label="Misi"><i class="fa-solid fa-list-check"></i></button>
     <button class="hud-btn nav-main" id="worldBtn" title="Teman satu dunia" aria-label="Teman satu dunia"><i class="fa-solid fa-people-group"></i></button>
     <button class="hud-btn nav-main" id="studentBtn" title="Profil siswa" aria-label="Profil siswa"><i class="fa-solid fa-user-graduate"></i></button>
+    <button class="hud-btn nav-main" id="returnHomeBtn" title="Kembali ke halaman utama" aria-label="Kembali ke halaman utama"><i class="fa-solid fa-house"></i></button>
     <button class="hud-btn nav-main nav-menu-toggle" id="menuToggle" title="Menu fitur" aria-label="Buka menu fitur" aria-expanded="false"><i class="fa-solid fa-grid-2"></i></button>
   </div>
   <div id="featureMenu" class="glass hidden pointer-events-auto" role="dialog" aria-label="Menu fitur AL Fajar">
@@ -491,9 +514,13 @@ window.__afDiagReady=true;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
 <script>let toastTimer;
 // Grade pilihan harus tersedia sebelum template learningHub dirender.
-let selectedGrade='SD';
-try { selectedGrade=localStorage.getItem('alfajar_selected_grade')||'SD'; } catch(e) {}
+let selectedGrade='SD',selectedClass=3;
+try { selectedGrade=localStorage.getItem('alfajar_selected_grade')||'SD'; selectedClass=Number(localStorage.getItem('alfajar_selected_class')||3); } catch(e) {}
 if(!['SD','SMP','SMA/SMK'].includes(selectedGrade))selectedGrade='SD';
+if(!Number.isInteger(selectedClass)||selectedClass<1||selectedClass>12)selectedClass=3;
+if(selectedGrade==='SD')selectedClass=Math.min(6,Math.max(1,selectedClass));
+else if(selectedGrade==='SMP')selectedClass=Math.min(9,Math.max(7,selectedClass));
+else selectedClass=Math.min(12,Math.max(10,selectedClass));
 
 
 if (!window.THREE) {
@@ -1975,6 +2002,39 @@ try{ownedShopItems=JSON.parse(localStorage.getItem('alfajar_owned_items_v21')||'
 
 function setMaterialColor(mesh,color){if(mesh.material&&mesh.material.color)mesh.material.color.setHex(color);}
 player.position.set(0,0,13);
+restorePlayerCheckpoint();
+
+
+// Player name tag: floating label above the avatar's head.
+let playerNameTag=null, playerNameTexture=null;
+function updatePlayerNameTag(){
+ if(!playerNameTag)return;
+ const label=(localStorage.getItem('alfajar_character_name')||'Petualang').trim().slice(0,18);
+ const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
+ const ctx=canvas.getContext('2d');
+ ctx.clearRect(0,0,512,128);
+ const radius=34;
+ ctx.fillStyle='rgba(8,25,48,0.88)';
+ ctx.beginPath();ctx.roundRect(18,12,476,104,radius);ctx.fill();
+ ctx.strokeStyle='#f5c451';ctx.lineWidth=7;ctx.stroke();
+ ctx.font='bold 48px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+ ctx.fillStyle='#ffffff';ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=5;
+ ctx.fillText(label,256,65,430);
+ const texture=new THREE.CanvasTexture(canvas);texture.needsUpdate=true;
+ const old=playerNameTag.material.map;
+ playerNameTag.material.map=texture;playerNameTag.material.needsUpdate=true;
+ if(old)old.dispose();
+ playerNameTag.visible=localStorage.getItem('alfajar_character_created')==='1';
+}
+{
+ const nameMaterial=new THREE.SpriteMaterial({map:new THREE.Texture(),transparent:true,depthTest:false,depthWrite:false});
+ playerNameTag=new THREE.Sprite(nameMaterial);
+ playerNameTag.position.set(0,4.05,0);
+ playerNameTag.scale.set(3.0,.75,1);
+ playerNameTag.renderOrder=20;
+ player.add(playerNameTag);
+ updatePlayerNameTag();
+}
 
 // NPC guide
 const npc=group(scene,-7,0,12);
@@ -2030,7 +2090,7 @@ function drawMiniMap(){
  mapCtx.fillStyle='#278eae';mapCtx.fillRect(cx+39*scale,cy-70*scale,6,140*scale);
  const points=[...buildings.map(b=>({x:b.x,z:b.z,c:'#e9d7a4'})),{x:82,z:-32,c:'#43c56e'},{x:-80,z:-31,c:'#e8b75e'}];
  for(const p of points){const x=cx+p.x*scale,y=cy+p.z*scale;mapCtx.fillStyle=p.c;mapCtx.fillRect(x-4,y-4,8,8);}
- for(const b of books){if(!b.got){mapCtx.fillStyle='#ffd34d';mapCtx.beginPath();mapCtx.arc(cx+b.group.position.x*scale,cy+b.group.position.z*scale,2.5,0,Math.PI*2);mapCtx.fill();}}
+ for(const [bookIndex,b] of books.entries()){if(!b.got){mapCtx.fillStyle='#ffd34d';mapCtx.beginPath();mapCtx.arc(cx+b.group.position.x*scale,cy+b.group.position.z*scale,2.5,0,Math.PI*2);mapCtx.fill();}}
  mapCtx.fillStyle='#f4a15b';mapCtx.beginPath();mapCtx.arc(cx+npc.position.x*scale,cy+npc.position.z*scale,4,0,Math.PI*2);mapCtx.fill();
  mapCtx.save();mapCtx.translate(cx+player.position.x*scale,cy+player.position.z*scale);mapCtx.rotate(player.rotation.y);mapCtx.fillStyle='#ffffff';mapCtx.beginPath();mapCtx.moveTo(0,-7);mapCtx.lineTo(5,5);mapCtx.lineTo(-5,5);mapCtx.closePath();mapCtx.fill();mapCtx.restore();
  const zone=currentInterior?'RUANG BELAJAR':Math.hypot(player.position.x,player.position.z)<18?'PLAZA':Math.abs(player.position.x)>65?'DISTRIK LUAR':'KOTA';
@@ -3155,6 +3215,52 @@ function addXP(v){playGameSfx('reward');
  if(gained){celebrateMilestone('LEVEL UP!','Kamu sekarang Level '+playerLevel+' · Bonus +'+(gained*10)+' koin');showToast(`LEVEL UP! Level ${playerLevel}! Bonus +${gained*10} koin`);}
  if(gained){coins+=gained*10;refreshWalletUI();saveWallet();}
 }
+
+const AF_REWARD_LEDGER_KEY='alfajar_reward_ledger_v1';
+let afRewardLedger={};
+try{afRewardLedger=JSON.parse(localStorage.getItem(AF_REWARD_LEDGER_KEY)||'{}')||{};}catch(e){afRewardLedger={};}
+function saveRewardLedger(){try{localStorage.setItem(AF_REWARD_LEDGER_KEY,JSON.stringify(afRewardLedger));}catch(e){}}
+function awardUniqueXP(rewardId,amount){
+ const id=String(rewardId||'').trim();
+ if(!id)return false;
+ if(afRewardLedger[id]){showToast('Hadiah XP untuk aktivitas ini sudah pernah kamu dapatkan.');return false;}
+ // Tandai sebelum memberi hadiah agar klik berulang tidak menggandakan XP.
+ afRewardLedger[id]={claimedAt:new Date().toISOString(),amount:Number(amount)||0};
+ saveRewardLedger();addXP(amount);return true;
+}
+function savePlayerCheckpoint(){
+ try{
+  const checkpoint={version:1,savedAt:new Date().toISOString(),
+   position:{x:player.position.x,y:player.position.y,z:player.position.z},
+   rotation:player.rotation.y,bookCount,schoolVisited,guideVisited,
+   wallet:{xp,coins,level:playerLevel},
+   characterName:localStorage.getItem('alfajar_character_name')||'Petualang',
+   grade:selectedGrade,classLevel:selectedClass};
+  localStorage.setItem('alfajar_game_checkpoint_v1',JSON.stringify(checkpoint));
+  saveWallet();saveRewardLedger();
+ }catch(e){}
+}
+function restorePlayerCheckpoint(){
+ try{
+  const cp=JSON.parse(localStorage.getItem('alfajar_game_checkpoint_v1')||'null');
+  if(!cp||cp.version!==1)return;
+  if(cp.position&&Number.isFinite(cp.position.x)&&Number.isFinite(cp.position.z)){
+   player.position.set(cp.position.x,0,cp.position.z);
+   player.rotation.y=Number(cp.rotation)||0;
+  }
+  bookCount=Math.max(bookCount,Number(cp.bookCount)||0);
+  schoolVisited=!!(schoolVisited||cp.schoolVisited);
+  guideVisited=!!(guideVisited||cp.guideVisited);
+  // Wallet utama tetap menjadi sumber data; checkpoint hanya memulihkan bila lebih baru.
+  if(cp.wallet&&cp.savedAt){
+   const current=JSON.parse(localStorage.getItem('alfajar_wallet_v21')||'{}');
+   if(Number(cp.wallet.level)>Number(current.level||0) ||
+      (Number(cp.wallet.level)===Number(current.level||0)&&Number(cp.wallet.xp)>Number(current.xp||0))){
+    xp=Number(cp.wallet.xp)||0;coins=Number(cp.wallet.coins)||0;playerLevel=Math.max(1,Number(cp.wallet.level)||1);saveWallet();
+   }
+  }
+ }catch(e){}
+}
 function openModal(html){const m=document.getElementById('modal');document.getElementById('modalContent').innerHTML=html;m.style.display='flex';}
 function closeModal(){if(typeof quizTimer!=='undefined'&&quizTimer)clearInterval(quizTimer);if(typeof quizState!=='undefined')quizState=null;document.getElementById('modal').style.display='none';}
 
@@ -3178,6 +3284,43 @@ const defaultQuestionBank=[
 let questionBank=defaultQuestionBank.slice();
 try{const savedBank=localStorage.getItem('alfajar_question_bank');if(savedBank){const parsed=JSON.parse(savedBank);if(Array.isArray(parsed)&&parsed.length)questionBank=parsed;}}catch(e){}
 let quizState=null,quizTimer=null;
+// Bank soal resmi SD Kelas 3 — Matematika Bab 1.
+// Seed digabung berdasarkan ID agar tidak menimpa soal guru yang sudah tersimpan.
+const grade3MathChapter1Questions=[{"id":"m3_b1_01","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membaca dan menulis bilangan","difficulty":"Dasar","type":"mcq","question":"Bilangan 475 dibaca ....","options":["Empat ratus tujuh puluh lima","Empat ratus lima puluh tujuh","Tujuh ratus empat puluh lima","Lima ratus tujuh puluh empat"],"answer":"Empat ratus tujuh puluh lima","explanation":"475 dibaca empat ratus tujuh puluh lima."},{"id":"m3_b1_02","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membaca dan menulis bilangan","difficulty":"Dasar","type":"mcq","question":"Lambang bilangan dari enam ratus dua puluh delapan adalah ....","options":["682","628","268","826"],"answer":"628","explanation":"Enam ratus dua puluh delapan ditulis 628."},{"id":"m3_b1_03","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Dasar","type":"mcq","question":"Angka 7 pada bilangan 372 menempati nilai tempat ....","options":["Satuan","Puluhan","Ratusan","Ribuan"],"answer":"Puluhan","explanation":"Angka 7 berada pada tempat puluhan, sehingga nilainya 70."},{"id":"m3_b1_04","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Komposisi dan dekomposisi bilangan","difficulty":"Dasar","type":"mcq","question":"Bentuk panjang dari bilangan 846 adalah ....","options":["800 + 40 + 6","800 + 6 + 4","80 + 40 + 6","800 + 400 + 6"],"answer":"800 + 40 + 6","explanation":"846 = 800 + 40 + 6."},{"id":"m3_b1_05","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membandingkan bilangan","difficulty":"Menengah","type":"mcq","question":"Bilangan yang lebih besar dari 569 adalah ....","options":["559","569","596","509"],"answer":"596","explanation":"596 lebih besar daripada 569 karena angka puluhannya 9, sedangkan 569 memiliki angka puluhan 6."},{"id":"m3_b1_06","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membandingkan bilangan","difficulty":"Dasar","type":"mcq","question":"Tanda perbandingan yang tepat untuk 738 ... 783 adalah ....","options":["Lebih besar dari","Lebih kecil dari","Sama dengan","Tidak dapat dibandingkan"],"answer":"Lebih kecil dari","explanation":"738 lebih kecil daripada 783."},{"id":"m3_b1_07","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Mengurutkan bilangan","difficulty":"Menengah","type":"mcq","question":"Urutan bilangan dari yang terkecil adalah ....","options":["425, 452, 524, 542","542, 524, 452, 425","452, 425, 542, 524","524, 542, 425, 452"],"answer":"425, 452, 524, 542","explanation":"Urutan dari terkecil adalah 425, 452, 524, lalu 542."},{"id":"m3_b1_08","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Komposisi dan dekomposisi bilangan","difficulty":"Dasar","type":"mcq","question":"Hasil dari 500 + 60 + 9 adalah ....","options":["569","596","659","509"],"answer":"569","explanation":"500 + 60 + 9 = 569."},{"id":"m3_b1_09","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Pola bilangan","difficulty":"Menengah","type":"mcq","question":"Perhatikan pola bilangan: 125, 150, 175, 200, .... Bilangan berikutnya adalah ....","options":["205","215","225","250"],"answer":"225","explanation":"Pola bertambah 25. Jadi, 200 + 25 = 225."},{"id":"m3_b1_10","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Menengah","type":"mcq","question":"Rani memiliki kartu angka yang membentuk bilangan 4 ratusan, 3 puluhan, dan 8 satuan. Bilangan yang terbentuk adalah ....","options":["483","438","348","834"],"answer":"438","explanation":"4 ratusan + 3 puluhan + 8 satuan = 400 + 30 + 8 = 438."},{"id":"m3_b1_11","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membaca dan menulis bilangan","difficulty":"Dasar","type":"tf","question":"Bilangan 906 dibaca sembilan ratus enam.","options":["Benar","Salah"],"answer":"Benar","explanation":"906 dibaca sembilan ratus enam. Angka 0 menunjukkan tidak ada puluhan."},{"id":"m3_b1_12","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Dasar","type":"tf","question":"Nilai angka 5 pada bilangan 352 adalah 5 satuan.","options":["Benar","Salah"],"answer":"Salah","explanation":"Angka 5 menempati tempat puluhan, sehingga nilainya 50."},{"id":"m3_b1_13","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Komposisi dan dekomposisi bilangan","difficulty":"Menengah","type":"tf","question":"Bentuk panjang dari 729 adalah 700 + 20 + 9.","options":["Benar","Salah"],"answer":"Benar","explanation":"729 terdiri atas 7 ratusan, 2 puluhan, dan 9 satuan."},{"id":"m3_b1_14","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membandingkan bilangan","difficulty":"Menengah","type":"tf","question":"Bilangan 684 lebih kecil daripada 648.","options":["Benar","Salah"],"answer":"Salah","explanation":"684 lebih besar daripada 648 karena angka puluhannya 8 lebih besar daripada 4."},{"id":"m3_b1_15","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Pola bilangan","difficulty":"Menengah","type":"tf","question":"Urutan bilangan 315, 325, 335, 345 memiliki pola bertambah 10.","options":["Benar","Salah"],"answer":"Benar","explanation":"Setiap bilangan bertambah 10 dari bilangan sebelumnya."},{"id":"m3_b1_16","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Membaca dan menulis bilangan","difficulty":"Dasar","type":"short","question":"Tuliskan lambang bilangan dari delapan ratus tujuh puluh dua!","options":[],"answer":"872","explanation":"Delapan ratus tujuh puluh dua ditulis 872."},{"id":"m3_b1_17","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Menengah","type":"short","question":"Nilai angka 6 pada bilangan 864 adalah ....","options":[],"answer":"60","explanation":"Angka 6 berada pada tempat puluhan, sehingga nilainya 60."},{"id":"m3_b1_18","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Komposisi dan dekomposisi bilangan","difficulty":"Menengah","type":"short","question":"Tuliskan bentuk panjang dari bilangan 593!","options":[],"answer":"500 + 90 + 3","explanation":"593 terdiri atas 5 ratusan, 9 puluhan, dan 3 satuan."},{"id":"m3_b1_19","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Mengurutkan bilangan","difficulty":"Menengah","type":"short","question":"Urutkan bilangan berikut dari yang terbesar: 275, 527, 257, 752!","options":[],"answer":"752, 527, 275, 257","explanation":"Urutan dari terbesar ke terkecil adalah 752, 527, 275, lalu 257."},{"id":"m3_b1_20","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Pola bilangan","difficulty":"Lanjutan","type":"short","question":"Lengkapi pola bilangan berikut: 340, 360, 380, ..., ....","options":[],"answer":"400, 420","explanation":"Pola bertambah 20. Setelah 380 adalah 400, kemudian 420."}];
+
+const grade3MathChapter2Questions=[{"id":"m3_b2_01","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan tanpa menyimpan","difficulty":"Dasar","type":"mcq","question":"Hasil dari 234 + 125 adalah ....","options":["349","359","369","379"],"answer":"359","explanation":"234 + 125 = 359. Jumlahkan satuan, puluhan, lalu ratusan."},{"id":"m3_b2_02","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan tanpa menyimpan","difficulty":"Dasar","type":"mcq","question":"Hasil dari 416 + 273 adalah ....","options":["679","689","699","669"],"answer":"689","explanation":"416 + 273 = 689."},{"id":"m3_b2_03","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan dengan menyimpan","difficulty":"Menengah","type":"mcq","question":"Hasil dari 358 + 127 adalah ....","options":["475","485","495","505"],"answer":"485","explanation":"8 + 7 = 15, tulis 5 dan simpan 1 puluhan. Hasil akhirnya 485."},{"id":"m3_b2_04","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan dengan menyimpan","difficulty":"Menengah","type":"mcq","question":"Hasil dari 267 + 158 adalah ....","options":["415","425","435","445"],"answer":"425","explanation":"267 + 158 = 425 dengan menyimpan pada penjumlahan satuan dan puluhan."},{"id":"m3_b2_05","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan tanpa meminjam","difficulty":"Dasar","type":"mcq","question":"Hasil dari 785 - 243 adalah ....","options":["532","542","552","562"],"answer":"542","explanation":"785 - 243 = 542."},{"id":"m3_b2_06","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan dengan meminjam","difficulty":"Menengah","type":"mcq","question":"Hasil dari 654 - 218 adalah ....","options":["426","436","446","456"],"answer":"436","explanation":"654 - 218 = 436. Pada satuan dan puluhan dilakukan peminjaman."},{"id":"m3_b2_07","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Soal cerita penjumlahan","difficulty":"Menengah","type":"mcq","question":"Di perpustakaan terdapat 325 buku cerita dan 146 buku pengetahuan. Jumlah seluruh buku adalah ....","options":["461","471","481","491"],"answer":"471","explanation":"325 + 146 = 471 buku."},{"id":"m3_b2_08","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Soal cerita pengurangan","difficulty":"Menengah","type":"mcq","question":"Pak Budi memiliki 850 bibit tanaman. Sebanyak 275 bibit dibagikan. Sisa bibit Pak Budi adalah ....","options":["565","575","585","595"],"answer":"575","explanation":"850 - 275 = 575 bibit."},{"id":"m3_b2_09","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Operasi penjumlahan dan pengurangan","difficulty":"Lanjutan","type":"mcq","question":"Hasil dari 300 + 245 - 120 adalah ....","options":["415","425","435","445"],"answer":"425","explanation":"300 + 245 = 545, kemudian 545 - 120 = 425."},{"id":"m3_b2_10","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Soal cerita dua langkah","difficulty":"Lanjutan","type":"mcq","question":"Siti mengumpulkan 178 stiker pada hari Senin dan 236 stiker pada hari Selasa. Jika 95 stiker diberikan kepada temannya, sisa stiker Siti adalah ....","options":["309","319","329","339"],"answer":"319","explanation":"178 + 236 = 414, lalu 414 - 95 = 319 stiker."},{"id":"m3_b2_11","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan tanpa menyimpan","difficulty":"Dasar","type":"tf","question":"Hasil dari 125 + 230 adalah 355.","options":["Benar","Salah"],"answer":"Benar","explanation":"125 + 230 = 355."},{"id":"m3_b2_12","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan dengan menyimpan","difficulty":"Menengah","type":"tf","question":"Hasil dari 348 + 127 adalah 465.","options":["Benar","Salah"],"answer":"Salah","explanation":"348 + 127 = 475, bukan 465."},{"id":"m3_b2_13","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan tanpa meminjam","difficulty":"Dasar","type":"tf","question":"Hasil dari 786 - 254 adalah 532.","options":["Benar","Salah"],"answer":"Benar","explanation":"786 - 254 = 532."},{"id":"m3_b2_14","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan dengan meminjam","difficulty":"Menengah","type":"tf","question":"Hasil dari 603 - 178 adalah 435.","options":["Benar","Salah"],"answer":"Salah","explanation":"603 - 178 = 425."},{"id":"m3_b2_15","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan","difficulty":"Dasar","type":"tf","question":"Jika 245 ditambah 100, hasilnya 345.","options":["Benar","Salah"],"answer":"Benar","explanation":"Menambahkan 100 membuat angka ratusan bertambah satu, sehingga hasilnya 345."},{"id":"m3_b2_16","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan tanpa menyimpan","difficulty":"Dasar","type":"short","question":"Hitunglah 326 + 142 = ....","options":[],"answer":"468","explanation":"326 + 142 = 468."},{"id":"m3_b2_17","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Penjumlahan dengan menyimpan","difficulty":"Menengah","type":"short","question":"Hitunglah 475 + 168 = ....","options":[],"answer":"643","explanation":"475 + 168 = 643."},{"id":"m3_b2_18","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan tanpa meminjam","difficulty":"Dasar","type":"short","question":"Hitunglah 927 - 315 = ....","options":[],"answer":"612","explanation":"927 - 315 = 612."},{"id":"m3_b2_19","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Pengurangan dengan meminjam","difficulty":"Menengah","type":"short","question":"Hitunglah 704 - 286 = ....","options":[],"answer":"418","explanation":"704 - 286 = 418."},{"id":"m3_b2_20","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan Bilangan Cacah sampai 1.000","topic":"Soal cerita pengurangan","difficulty":"Menengah","type":"short","question":"Di toko ada 625 pensil. Sebanyak 248 pensil terjual. Berapa pensil yang tersisa?","options":[],"answer":"377","explanation":"625 - 248 = 377 pensil."}];
+
+const grade3MathChapter3Questions=[{"id":"m3_b3_01","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian sebagai penjumlahan berulang","difficulty":"Dasar","type":"mcq","question":"Hasil dari 6 × 7 adalah ....","options":["36","42","48","56"],"answer":"42","explanation":"6 × 7 berarti 6 kelompok yang masing-masing berisi 7. Hasilnya 42."},{"id":"m3_b3_02","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta perkalian","difficulty":"Dasar","type":"mcq","question":"Hasil dari 8 × 9 adalah ....","options":["64","70","72","81"],"answer":"72","explanation":"8 × 9 = 72."},{"id":"m3_b3_03","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian","difficulty":"Dasar","type":"mcq","question":"Hasil dari 12 × 5 adalah ....","options":["50","55","60","65"],"answer":"60","explanation":"12 × 5 = 60."},{"id":"m3_b3_04","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian bilangan dua angka","difficulty":"Menengah","type":"mcq","question":"Hasil dari 24 × 3 adalah ....","options":["62","72","82","92"],"answer":"72","explanation":"24 × 3 = 72."},{"id":"m3_b3_05","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian sampai 1.000","difficulty":"Menengah","type":"mcq","question":"Hasil dari 125 × 4 adalah ....","options":["400","450","500","550"],"answer":"500","explanation":"125 × 4 = 500."},{"id":"m3_b3_06","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta pembagian","difficulty":"Dasar","type":"mcq","question":"Hasil dari 56 ÷ 7 adalah ....","options":["6","7","8","9"],"answer":"8","explanation":"56 ÷ 7 = 8 karena 7 × 8 = 56."},{"id":"m3_b3_07","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Pembagian","difficulty":"Dasar","type":"mcq","question":"Hasil dari 96 ÷ 8 adalah ....","options":["10","11","12","13"],"answer":"12","explanation":"96 ÷ 8 = 12."},{"id":"m3_b3_08","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Pembagian bilangan","difficulty":"Menengah","type":"mcq","question":"Hasil dari 144 ÷ 12 adalah ....","options":["10","11","12","13"],"answer":"12","explanation":"144 ÷ 12 = 12."},{"id":"m3_b3_09","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Soal cerita perkalian","difficulty":"Menengah","type":"mcq","question":"Ada 9 kotak. Setiap kotak berisi 25 pensil. Jumlah seluruh pensil adalah ....","options":["205","215","225","235"],"answer":"225","explanation":"9 × 25 = 225 pensil."},{"id":"m3_b3_10","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Soal cerita pembagian","difficulty":"Menengah","type":"mcq","question":"Sebanyak 168 permen dibagikan sama banyak kepada 8 anak. Setiap anak mendapat ....","options":["18","20","21","24"],"answer":"21","explanation":"168 ÷ 8 = 21 permen untuk setiap anak."},{"id":"m3_b3_11","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta perkalian","difficulty":"Dasar","type":"tf","question":"7 × 8 = 56.","options":["Benar","Salah"],"answer":"Benar","explanation":"Tujuh kali delapan sama dengan 56."},{"id":"m3_b3_12","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta perkalian","difficulty":"Dasar","type":"tf","question":"9 × 6 = 56.","options":["Benar","Salah"],"answer":"Salah","explanation":"9 × 6 = 54, bukan 56."},{"id":"m3_b3_13","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta pembagian","difficulty":"Dasar","type":"tf","question":"72 ÷ 9 = 8.","options":["Benar","Salah"],"answer":"Benar","explanation":"72 dibagi 9 sama dengan 8 karena 9 × 8 = 72."},{"id":"m3_b3_14","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Pembagian","difficulty":"Menengah","type":"tf","question":"100 ÷ 4 = 20.","options":["Benar","Salah"],"answer":"Salah","explanation":"100 ÷ 4 = 25."},{"id":"m3_b3_15","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian sebagai penjumlahan berulang","difficulty":"Dasar","type":"tf","question":"Perkalian dapat dipahami sebagai penjumlahan berulang.","options":["Benar","Salah"],"answer":"Benar","explanation":"Contohnya 3 × 4 sama dengan 4 + 4 + 4."},{"id":"m3_b3_16","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta perkalian","difficulty":"Dasar","type":"short","question":"Hitunglah 9 × 7 = ....","options":[],"answer":"63","explanation":"9 × 7 = 63."},{"id":"m3_b3_17","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Perkalian bilangan dua angka","difficulty":"Menengah","type":"short","question":"Hitunglah 32 × 5 = ....","options":[],"answer":"160","explanation":"32 × 5 = 160."},{"id":"m3_b3_18","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Fakta pembagian","difficulty":"Dasar","type":"short","question":"Hitunglah 81 ÷ 9 = ....","options":[],"answer":"9","explanation":"81 ÷ 9 = 9."},{"id":"m3_b3_19","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Pembagian sampai 1.000","difficulty":"Menengah","type":"short","question":"Hitunglah 156 ÷ 6 = ....","options":[],"answer":"26","explanation":"156 ÷ 6 = 26 karena 26 × 6 = 156."},{"id":"m3_b3_20","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian Bilangan Cacah sampai 1.000","topic":"Soal cerita perkalian","difficulty":"Menengah","type":"short","question":"Ibu memiliki 6 kantong jeruk. Setiap kantong berisi 18 jeruk. Berapa jumlah seluruh jeruk?","options":[],"answer":"108","explanation":"6 × 18 = 108 jeruk."}];
+
+const grade3MathChapter4Questions=[{"id":"m3_b4_01","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Mengenali kalimat penjumlahan","difficulty":"Dasar","type":"mcq","question":"Kalimat matematika yang tepat untuk '245 ditambah 132' adalah ....","options":["245 - 132 = 113","245 + 132 = 377","245 × 132 = 377","245 + 132 = 367"],"answer":"245 + 132 = 377","explanation":"Kata 'ditambah' menunjukkan operasi penjumlahan. 245 + 132 = 377."},{"id":"m3_b4_02","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Mengenali kalimat pengurangan","difficulty":"Dasar","type":"mcq","question":"Kalimat matematika dari 'selisih 560 dan 125' adalah ....","options":["560 + 125 = 685","560 - 125 = 435","560 × 125 = 435","560 ÷ 125 = 435"],"answer":"560 - 125 = 435","explanation":"Kata 'selisih' menunjukkan operasi pengurangan. 560 - 125 = 435."},{"id":"m3_b4_03","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menentukan bilangan yang belum diketahui","difficulty":"Menengah","type":"mcq","question":"Bilangan yang tepat untuk mengisi kotak pada 235 + □ = 300 adalah ....","options":["55","65","75","85"],"answer":"65","explanation":"300 - 235 = 65, jadi bilangan yang tepat adalah 65."},{"id":"m3_b4_04","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menentukan bilangan yang belum diketahui","difficulty":"Menengah","type":"mcq","question":"Bilangan yang tepat untuk mengisi kotak pada 480 - □ = 350 adalah ....","options":["120","130","140","150"],"answer":"130","explanation":"480 - 350 = 130, jadi bilangan yang dikurangkan adalah 130."},{"id":"m3_b4_05","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Dasar","type":"mcq","question":"Kalimat matematika yang sesuai dengan 'Dina memiliki 125 kelereng, lalu mendapat 75 kelereng lagi' adalah ....","options":["125 - 75 = 50","125 + 75 = 200","125 × 75 = 200","125 + 75 = 190"],"answer":"125 + 75 = 200","explanation":"Kelereng Dina bertambah, sehingga menggunakan penjumlahan: 125 + 75 = 200."},{"id":"m3_b4_06","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Dasar","type":"mcq","question":"Riko memiliki 350 kartu. Ia memberikan 125 kartu kepada temannya. Kalimat matematika yang tepat adalah ....","options":["350 + 125 = 475","350 - 125 = 225","350 × 125 = 225","350 - 125 = 235"],"answer":"350 - 125 = 225","explanation":"Kartu Riko berkurang karena diberikan, sehingga menggunakan pengurangan."},{"id":"m3_b4_07","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Kalimat matematika dua operasi","difficulty":"Menengah","type":"mcq","question":"Hasil dari kalimat matematika 275 + 148 - 100 adalah ....","options":["313","323","333","343"],"answer":"323","explanation":"275 + 148 = 423, kemudian 423 - 100 = 323."},{"id":"m3_b4_08","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menentukan bilangan yang belum diketahui","difficulty":"Menengah","type":"mcq","question":"Pada kalimat 625 - □ = 400, bilangan yang tepat untuk mengisi kotak adalah ....","options":["215","225","235","245"],"answer":"225","explanation":"625 - 400 = 225."},{"id":"m3_b4_09","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Menengah","type":"mcq","question":"Perpustakaan memiliki 235 buku. Sekolah membeli beberapa buku lagi sehingga jumlahnya menjadi 300 buku. Kalimat matematika yang tepat adalah ....","options":["235 - 65 = 300","235 + 65 = 300","300 + 65 = 235","235 + 300 = 65"],"answer":"235 + 65 = 300","explanation":"Jumlah buku bertambah 65, sehingga 235 + 65 = 300."},{"id":"m3_b4_10","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Menengah","type":"mcq","question":"Ada 720 lembar kertas. Sebanyak 185 lembar digunakan. Kalimat matematika dan hasil yang tepat adalah ....","options":["720 + 185 = 905","720 - 185 = 535","720 - 185 = 545","720 + 185 = 895"],"answer":"720 - 185 = 535","explanation":"Kertas digunakan berarti jumlahnya berkurang: 720 - 185 = 535."},{"id":"m3_b4_11","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Mengenali kalimat penjumlahan","difficulty":"Dasar","type":"tf","question":"Kalimat matematika untuk 'jumlah 125 dan 75' adalah 125 + 75 = 200.","options":["Benar","Salah"],"answer":"Benar","explanation":"Kata 'jumlah' menunjukkan operasi penjumlahan."},{"id":"m3_b4_12","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Mengenali kalimat pengurangan","difficulty":"Dasar","type":"tf","question":"Kata 'sisa' dalam soal cerita biasanya menunjukkan operasi penjumlahan.","options":["Benar","Salah"],"answer":"Salah","explanation":"Kata 'sisa' biasanya menunjukkan pengurangan karena jumlah benda berkurang atau diambil."},{"id":"m3_b4_13","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menentukan bilangan yang belum diketahui","difficulty":"Menengah","type":"tf","question":"Pada kalimat 450 - □ = 300, bilangan yang tepat untuk kotak adalah 150.","options":["Benar","Salah"],"answer":"Benar","explanation":"450 - 300 = 150."},{"id":"m3_b4_14","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Memeriksa kalimat matematika","difficulty":"Dasar","type":"tf","question":"Kalimat matematika 275 + 125 = 400 memiliki hasil yang benar.","options":["Benar","Salah"],"answer":"Benar","explanation":"275 + 125 = 400."},{"id":"m3_b4_15","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Memilih operasi hitung","difficulty":"Dasar","type":"tf","question":"Jika jumlah benda berkurang, kita dapat menggunakan operasi pengurangan.","options":["Benar","Salah"],"answer":"Benar","explanation":"Pengurangan digunakan ketika jumlah benda diambil, dipakai, atau berkurang."},{"id":"m3_b4_16","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Mengenali kalimat penjumlahan","difficulty":"Dasar","type":"short","question":"Tuliskan kalimat matematika dari '325 ditambah 140' beserta hasilnya!","options":[],"answer":"325 + 140 = 465","explanation":"325 + 140 = 465."},{"id":"m3_b4_17","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menentukan bilangan yang belum diketahui","difficulty":"Menengah","type":"short","question":"Lengkapi kalimat matematika berikut: 560 - □ = 420. Bilangan yang tepat adalah ....","options":[],"answer":"140","explanation":"560 - 420 = 140."},{"id":"m3_b4_18","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Menengah","type":"short","question":"Buatlah kalimat matematika dari cerita: Beni mempunyai 275 kelereng. Ia kehilangan 50 kelereng. Berapa kelereng Beni sekarang?","options":[],"answer":"275 - 50 = 225","explanation":"Kelereng berkurang, jadi 275 - 50 = 225."},{"id":"m3_b4_19","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Kalimat matematika dua operasi","difficulty":"Menengah","type":"short","question":"Hitunglah hasil dari 350 + 125 - 75 = ....","options":[],"answer":"400","explanation":"350 + 125 = 475, lalu 475 - 75 = 400."},{"id":"m3_b4_20","subject":"Matematika","grade":"SD","chapter":"Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan","topic":"Menyusun kalimat matematika dari cerita","difficulty":"Lanjutan","type":"short","question":"Di aula terdapat 450 kursi. Sebanyak 175 kursi sudah terisi. Tuliskan kalimat matematika untuk mengetahui kursi yang masih kosong dan hasilnya!","options":[],"answer":"450 - 175 = 275","explanation":"Kursi kosong = jumlah seluruh kursi dikurangi kursi terisi, yaitu 450 - 175 = 275."}];
+
+const grade3IPASChapter1Questions=[{"id":"ipas3_b1_01","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Organ tubuh yang digunakan untuk melihat adalah ....","options":["Telinga","Mata","Hidung","Kulit"],"answer":"Mata","explanation":"Mata merupakan indra penglihatan yang membantu kita melihat benda di sekitar."},{"id":"ipas3_b1_02","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Kita dapat mendengar bunyi menggunakan ....","options":["Telinga","Lidah","Mata","Kulit"],"answer":"Telinga","explanation":"Telinga merupakan indra pendengaran."},{"id":"ipas3_b1_03","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Indra penciuman adalah ....","options":["Kulit","Lidah","Hidung","Telinga"],"answer":"Hidung","explanation":"Hidung membantu kita mengenali berbagai bau."},{"id":"ipas3_b1_04","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Bagian tubuh yang membantu kita mengecap rasa manis dan asin adalah ....","options":["Mata","Lidah","Telinga","Hidung"],"answer":"Lidah","explanation":"Lidah merupakan indra pengecap yang membantu mengenali rasa."},{"id":"ipas3_b1_05","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Kulit membantu kita merasakan ....","options":["Warna benda","Bunyi musik","Panas dan dingin","Aroma bunga"],"answer":"Panas dan dingin","explanation":"Kulit merupakan indra peraba. Kulit dapat merasakan sentuhan, panas, dan dingin."},{"id":"ipas3_b1_06","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Organ tubuh dan fungsinya","difficulty":"Menengah","type":"mcq","question":"Organ yang memompa darah ke seluruh tubuh adalah ....","options":["Paru-paru","Jantung","Lambung","Ginjal"],"answer":"Jantung","explanation":"Jantung memompa darah agar mengalir ke seluruh tubuh."},{"id":"ipas3_b1_07","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Organ tubuh dan fungsinya","difficulty":"Dasar","type":"mcq","question":"Kita bernapas menggunakan ....","options":["Paru-paru","Lambung","Usus","Tulang"],"answer":"Paru-paru","explanation":"Paru-paru merupakan organ utama dalam proses pernapasan."},{"id":"ipas3_b1_08","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Organ tubuh dan fungsinya","difficulty":"Menengah","type":"mcq","question":"Makanan dicerna dan diolah di dalam sistem pencernaan. Salah satu organ yang membantu proses tersebut adalah ....","options":["Jantung","Lambung","Telinga","Mata"],"answer":"Lambung","explanation":"Lambung membantu mengolah makanan dalam proses pencernaan."},{"id":"ipas3_b1_09","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Cara menjaga kesehatan organ tubuh","difficulty":"Menengah","type":"mcq","question":"Kebiasaan yang baik untuk menjaga kesehatan mata adalah ....","options":["Membaca di tempat gelap","Menatap layar sangat dekat","Membaca dengan pencahayaan cukup","Mengucek mata dengan tangan kotor"],"answer":"Membaca dengan pencahayaan cukup","explanation":"Pencahayaan yang cukup membantu menjaga kenyamanan mata saat membaca."},{"id":"ipas3_b1_10","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Cara menjaga kesehatan organ tubuh","difficulty":"Menengah","type":"mcq","question":"Cara menjaga kesehatan telinga yang tepat adalah ....","options":["Memasukkan benda tajam ke telinga","Mendengarkan musik dengan volume sangat keras","Membersihkan bagian luar telinga dengan hati-hati","Memasukkan jari terlalu dalam"],"answer":"Membersihkan bagian luar telinga dengan hati-hati","explanation":"Telinga perlu dijaga kebersihannya. Jangan memasukkan benda ke dalam saluran telinga."},{"id":"ipas3_b1_11","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"tf","question":"Mata merupakan indra untuk melihat.","options":["Benar","Salah"],"answer":"Benar","explanation":"Mata membantu kita melihat bentuk, warna, dan gerakan."},{"id":"ipas3_b1_12","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"tf","question":"Hidung digunakan untuk mendengar suara.","options":["Benar","Salah"],"answer":"Salah","explanation":"Hidung digunakan untuk mencium bau, sedangkan telinga digunakan untuk mendengar."},{"id":"ipas3_b1_13","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"tf","question":"Lidah membantu kita mengenali rasa makanan.","options":["Benar","Salah"],"answer":"Benar","explanation":"Lidah merupakan indra pengecap."},{"id":"ipas3_b1_14","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Organ tubuh dan fungsinya","difficulty":"Menengah","type":"tf","question":"Jantung bertugas memompa darah ke seluruh tubuh.","options":["Benar","Salah"],"answer":"Benar","explanation":"Jantung memompa darah agar diedarkan ke seluruh tubuh."},{"id":"ipas3_b1_15","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Cara menjaga kesehatan organ tubuh","difficulty":"Menengah","type":"tf","question":"Mendengarkan suara yang terlalu keras dalam waktu lama baik untuk telinga.","options":["Benar","Salah"],"answer":"Salah","explanation":"Suara yang terlalu keras dapat mengganggu dan merusak pendengaran."},{"id":"ipas3_b1_16","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"short","question":"Sebutkan organ tubuh yang digunakan untuk mencium bau!","options":[],"answer":"Hidung","explanation":"Hidung merupakan indra penciuman."},{"id":"ipas3_b1_17","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Panca indra dan fungsinya","difficulty":"Dasar","type":"short","question":"Apa nama indra yang digunakan untuk merasakan panas dan dingin?","options":[],"answer":"Kulit","explanation":"Kulit merupakan indra peraba."},{"id":"ipas3_b1_18","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Organ tubuh dan fungsinya","difficulty":"Dasar","type":"short","question":"Sebutkan organ tubuh yang berfungsi memompa darah!","options":[],"answer":"Jantung","explanation":"Jantung memompa darah ke seluruh tubuh."},{"id":"ipas3_b1_19","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Menjaga kesehatan tubuh","difficulty":"Menengah","type":"short","question":"Mengapa kita perlu menjaga kebersihan tangan sebelum makan?","options":[],"answer":"Agar kuman tidak ikut masuk ke tubuh bersama makanan","explanation":"Tangan yang bersih membantu mencegah kuman berpindah ke makanan dan masuk ke tubuh."},{"id":"ipas3_b1_20","subject":"IPAS","grade":"SD","chapter":"Bab 1: Organ Tubuh Manusia dan Panca Indera","topic":"Cara menjaga kesehatan organ tubuh","difficulty":"Menengah","type":"short","question":"Sebutkan satu cara menjaga kesehatan mata!","options":[],"answer":"Membaca dengan pencahayaan yang cukup","explanation":"Contoh cara menjaga mata adalah membaca dengan pencahayaan cukup dan memberi jeda saat menggunakan layar."}];
+
+const grade3IPASChapter2Questions=[{"id":"ipas3_b2_01","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup kupu-kupu","difficulty":"Dasar","type":"mcq","question":"Urutan siklus hidup kupu-kupu yang benar adalah ....","options":["Telur – ulat – kepompong – kupu-kupu","Telur – kepompong – ulat – kupu-kupu","Ulat – telur – kupu-kupu – kepompong","Kupu-kupu – telur – kepompong – ulat"],"answer":"Telur – ulat – kepompong – kupu-kupu","explanation":"Kupu-kupu berkembang melalui tahap telur, ulat (larva), kepompong (pupa), lalu kupu-kupu dewasa."},{"id":"ipas3_b2_02","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup ayam","difficulty":"Dasar","type":"mcq","question":"Tahap setelah telur pada siklus hidup ayam adalah ....","options":["Anak ayam","Kepompong","Ulat","Ayam dewasa"],"answer":"Anak ayam","explanation":"Telur ayam menetas menjadi anak ayam, kemudian tumbuh menjadi ayam dewasa."},{"id":"ipas3_b2_03","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup katak","difficulty":"Dasar","type":"mcq","question":"Hewan yang mengalami perubahan bentuk melalui tahap telur, berudu, katak muda, dan katak dewasa adalah ....","options":["Kucing","Katak","Ayam","Kupu-kupu"],"answer":"Katak","explanation":"Katak mengalami perubahan tahap hidup dari telur menjadi berudu, katak muda, lalu katak dewasa."},{"id":"ipas3_b2_04","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Tahap pertumbuhan hewan","difficulty":"Menengah","type":"mcq","question":"Tahap ketika ulat berubah dan berada di dalam kepompong disebut ....","options":["Telur","Larva","Pupa","Dewasa"],"answer":"Pupa","explanation":"Kepompong merupakan tahap pupa dalam siklus hidup kupu-kupu."},{"id":"ipas3_b2_05","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Perkembangbiakan makhluk hidup","difficulty":"Dasar","type":"mcq","question":"Makhluk hidup yang berkembang biak dengan cara bertelur adalah ....","options":["Ayam","Kucing","Sapi","Kambing"],"answer":"Ayam","explanation":"Ayam berkembang biak dengan bertelur."},{"id":"ipas3_b2_06","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup tumbuhan","difficulty":"Menengah","type":"mcq","question":"Biji tanaman yang mendapat air, udara, dan kondisi yang sesuai dapat ....","options":["Membeku","Berkecambah","Berubah menjadi batu","Langsung berbunga"],"answer":"Berkecambah","explanation":"Biji dapat berkecambah dan tumbuh menjadi tanaman baru jika kondisi yang dibutuhkan tersedia."},{"id":"ipas3_b2_07","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Pertumbuhan tumbuhan","difficulty":"Menengah","type":"mcq","question":"Bagian tumbuhan yang biasanya tumbuh pertama kali saat biji berkecambah adalah ....","options":["Akar","Bunga","Buah","Daun tua"],"answer":"Akar","explanation":"Akar muda biasanya muncul lebih dahulu untuk membantu menyerap air dan menambatkan tumbuhan."},{"id":"ipas3_b2_08","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Pertumbuhan makhluk hidup","difficulty":"Dasar","type":"mcq","question":"Anak kucing tumbuh menjadi kucing dewasa. Peristiwa ini menunjukkan bahwa makhluk hidup ....","options":["Mengalami pertumbuhan","Tidak berubah","Menjadi benda mati","Tidak membutuhkan makanan"],"answer":"Mengalami pertumbuhan","explanation":"Makhluk hidup mengalami pertumbuhan dan perubahan selama siklus hidupnya."},{"id":"ipas3_b2_09","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Metamorfosis","difficulty":"Menengah","type":"mcq","question":"Perubahan bentuk tubuh yang jelas pada hewan selama pertumbuhannya disebut ....","options":["Metamorfosis","Fotosintesis","Penguapan","Pencernaan"],"answer":"Metamorfosis","explanation":"Metamorfosis adalah perubahan bentuk tubuh pada tahap perkembangan hewan tertentu."},{"id":"ipas3_b2_10","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Metamorfosis sempurna dan tidak sempurna","difficulty":"Lanjutan","type":"mcq","question":"Contoh hewan yang mengalami metamorfosis tidak sempurna adalah ....","options":["Belalang","Kupu-kupu","Nyamuk","Lalat"],"answer":"Belalang","explanation":"Belalang mengalami tahap telur, nimfa, dan dewasa tanpa tahap kepompong."},{"id":"ipas3_b2_11","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup kupu-kupu","difficulty":"Dasar","type":"tf","question":"Kupu-kupu mengalami tahap telur, ulat, kepompong, dan dewasa.","options":["Benar","Salah"],"answer":"Benar","explanation":"Itulah urutan umum siklus hidup kupu-kupu."},{"id":"ipas3_b2_12","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup ayam","difficulty":"Dasar","type":"tf","question":"Anak ayam menetas dari kepompong.","options":["Benar","Salah"],"answer":"Salah","explanation":"Anak ayam menetas dari telur, bukan kepompong."},{"id":"ipas3_b2_13","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup katak","difficulty":"Dasar","type":"tf","question":"Berudu merupakan salah satu tahap dalam siklus hidup katak.","options":["Benar","Salah"],"answer":"Benar","explanation":"Telur katak menetas menjadi berudu sebelum tumbuh menjadi katak muda dan dewasa."},{"id":"ipas3_b2_14","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Tahap pertumbuhan hewan","difficulty":"Menengah","type":"tf","question":"Semua hewan mengalami tahap kepompong dalam siklus hidupnya.","options":["Benar","Salah"],"answer":"Salah","explanation":"Hanya hewan tertentu, seperti kupu-kupu, yang memiliki tahap kepompong."},{"id":"ipas3_b2_15","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup tumbuhan","difficulty":"Dasar","type":"tf","question":"Tumbuhan dapat tumbuh dari biji menjadi tanaman dewasa.","options":["Benar","Salah"],"answer":"Benar","explanation":"Biji dapat berkecambah, tumbuh menjadi tanaman muda, lalu tanaman dewasa."},{"id":"ipas3_b2_16","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup kupu-kupu","difficulty":"Dasar","type":"short","question":"Apa nama tahap setelah ulat dalam siklus hidup kupu-kupu?","options":[],"answer":"Kepompong","explanation":"Setelah menjadi ulat, kupu-kupu memasuki tahap kepompong atau pupa."},{"id":"ipas3_b2_17","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup katak","difficulty":"Menengah","type":"short","question":"Apa nama anak katak yang hidup di air dan bernapas dengan insang?","options":[],"answer":"Berudu","explanation":"Berudu adalah tahap awal kehidupan katak setelah menetas dari telur."},{"id":"ipas3_b2_18","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup tumbuhan","difficulty":"Dasar","type":"short","question":"Dari apakah tanaman baru dapat tumbuh pada banyak jenis tumbuhan?","options":[],"answer":"Biji","explanation":"Banyak tumbuhan berkembang biak melalui biji yang dapat berkecambah."},{"id":"ipas3_b2_19","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Perkembangbiakan makhluk hidup","difficulty":"Dasar","type":"short","question":"Sebutkan satu contoh hewan yang berkembang biak dengan bertelur!","options":[],"answer":"Ayam","explanation":"Ayam merupakan salah satu hewan yang berkembang biak dengan bertelur."},{"id":"ipas3_b2_20","subject":"IPAS","grade":"SD","chapter":"Bab 2: Siklus Hidup Makhluk Hidup","topic":"Siklus hidup kupu-kupu","difficulty":"Menengah","type":"short","question":"Tuliskan urutan siklus hidup kupu-kupu secara lengkap!","options":[],"answer":"Telur – ulat – kepompong – kupu-kupu dewasa","explanation":"Siklus hidup kupu-kupu terdiri atas telur, ulat, kepompong, dan kupu-kupu dewasa."}];
+
+const grade3IPASChapter3Questions=[{"id":"ipas3_b3_01","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Pengertian interaksi sosial","difficulty":"Dasar","type":"mcq","question":"Kegiatan yang dilakukan bersama-sama untuk mencapai tujuan disebut ....","options":["Kerja sama","Persaingan","Pertengkaran","Perdebatan"],"answer":"Kerja sama","explanation":"Kerja sama adalah kegiatan yang dilakukan beberapa orang untuk mencapai tujuan bersama."},{"id":"ipas3_b3_02","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Interaksi sosial di sekolah","difficulty":"Dasar","type":"mcq","question":"Contoh interaksi sosial di lingkungan sekolah adalah ....","options":["Membaca sendirian di kamar","Berdiskusi dengan teman","Tidur siang","Menonton televisi sendiri"],"answer":"Berdiskusi dengan teman","explanation":"Berdiskusi melibatkan komunikasi dan hubungan antara beberapa orang."},{"id":"ipas3_b3_03","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Sikap dalam interaksi sosial","difficulty":"Dasar","type":"mcq","question":"Saat teman berbicara, sikap yang baik adalah ....","options":["Memotong pembicaraan","Mendengarkan dengan baik","Mengejek pendapatnya","Berteriak lebih keras"],"answer":"Mendengarkan dengan baik","explanation":"Mendengarkan menunjukkan sikap menghargai orang lain."},{"id":"ipas3_b3_04","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Tolong-menolong","difficulty":"Dasar","type":"mcq","question":"Jika melihat teman kesulitan membawa buku, sebaiknya kita ....","options":["Membiarkannya","Menertawakannya","Menawarkan bantuan","Menyembunyikan bukunya"],"answer":"Menawarkan bantuan","explanation":"Menolong teman merupakan contoh sikap peduli dan saling membantu."},{"id":"ipas3_b3_05","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Gotong royong","difficulty":"Dasar","type":"mcq","question":"Kegiatan membersihkan kelas bersama-sama disebut ....","options":["Gotong royong","Bertengkar","Bermain sendiri","Berlomba mengejek"],"answer":"Gotong royong","explanation":"Gotong royong adalah bekerja bersama untuk kepentingan bersama."},{"id":"ipas3_b3_06","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Menghargai perbedaan","difficulty":"Menengah","type":"mcq","question":"Ketika berbeda pendapat dengan teman, sebaiknya kita ....","options":["Memaksakan pendapat","Marah dan pergi","Berdiskusi dengan santun","Mengejek teman"],"answer":"Berdiskusi dengan santun","explanation":"Perbedaan pendapat dapat diselesaikan dengan berdiskusi dan saling menghargai."},{"id":"ipas3_b3_07","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Interaksi sosial di lingkungan rumah","difficulty":"Dasar","type":"mcq","question":"Contoh interaksi sosial di lingkungan rumah adalah ....","options":["Menyapa tetangga","Mengunci diri dan tidak berbicara","Membuang sampah di halaman tetangga","Mengganggu orang lain"],"answer":"Menyapa tetangga","explanation":"Menyapa tetangga merupakan bentuk komunikasi dan hubungan sosial."},{"id":"ipas3_b3_08","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Manfaat kerja sama","difficulty":"Menengah","type":"mcq","question":"Manfaat bekerja sama saat mengerjakan tugas kelompok adalah ....","options":["Pekerjaan menjadi lebih ringan","Pekerjaan selalu lebih lama","Teman menjadi bermusuhan","Tidak ada yang belajar"],"answer":"Pekerjaan menjadi lebih ringan","explanation":"Dengan berbagi tugas, pekerjaan dapat diselesaikan bersama dengan lebih mudah."},{"id":"ipas3_b3_09","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Aturan dalam interaksi sosial","difficulty":"Menengah","type":"mcq","question":"Saat bermain bersama, aturan permainan perlu dipatuhi agar ....","options":["Permainan berjalan tertib dan adil","Kita selalu menang","Teman merasa kesal","Permainan menjadi kacau"],"answer":"Permainan berjalan tertib dan adil","explanation":"Aturan membantu semua pemain bermain dengan tertib dan adil."},{"id":"ipas3_b3_10","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Interaksi sosial di sekolah","difficulty":"Dasar","type":"mcq","question":"Ketika ada teman baru di kelas, tindakan yang tepat adalah ....","options":["Mengabaikannya","Mengajaknya berkenalan","Menertawakannya","Melarangnya bermain"],"answer":"Mengajaknya berkenalan","explanation":"Menyambut teman baru dengan ramah membantu membangun hubungan yang baik."},{"id":"ipas3_b3_11","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Interaksi sosial di lingkungan rumah","difficulty":"Dasar","type":"tf","question":"Menyapa tetangga dengan ramah merupakan contoh interaksi sosial.","options":["Benar","Salah"],"answer":"Benar","explanation":"Sapaan merupakan bentuk komunikasi antarmanusia."},{"id":"ipas3_b3_12","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Pengertian kerja sama","difficulty":"Dasar","type":"tf","question":"Kerja sama berarti melakukan semua pekerjaan sendiri.","options":["Benar","Salah"],"answer":"Salah","explanation":"Kerja sama dilakukan bersama orang lain untuk mencapai tujuan bersama."},{"id":"ipas3_b3_13","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Menghargai perbedaan","difficulty":"Menengah","type":"tf","question":"Menghargai pendapat teman dapat menjaga hubungan baik.","options":["Benar","Salah"],"answer":"Benar","explanation":"Saling menghargai membantu menciptakan hubungan yang rukun."},{"id":"ipas3_b3_14","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Sikap dalam interaksi sosial","difficulty":"Dasar","type":"tf","question":"Mengejek teman yang berbeda pendapat merupakan sikap yang baik.","options":["Benar","Salah"],"answer":"Salah","explanation":"Kita perlu menghormati perbedaan pendapat dan berbicara dengan santun."},{"id":"ipas3_b3_15","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Gotong royong","difficulty":"Dasar","type":"tf","question":"Gotong royong dapat membuat pekerjaan bersama terasa lebih ringan.","options":["Benar","Salah"],"answer":"Benar","explanation":"Pekerjaan dibagi dan dilakukan bersama sehingga lebih mudah diselesaikan."},{"id":"ipas3_b3_16","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Pengertian interaksi sosial","difficulty":"Dasar","type":"short","question":"Apa istilah untuk kegiatan bekerja bersama-sama demi tujuan bersama?","options":[],"answer":"Kerja sama","explanation":"Kerja sama dilakukan oleh dua orang atau lebih untuk mencapai tujuan bersama."},{"id":"ipas3_b3_17","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Interaksi sosial di sekolah","difficulty":"Dasar","type":"short","question":"Sebutkan satu contoh interaksi sosial di sekolah!","options":[],"answer":"Berdiskusi dengan teman","explanation":"Contohnya berdiskusi, belajar kelompok, menyapa guru, atau bermain bersama."},{"id":"ipas3_b3_18","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Menghargai perbedaan","difficulty":"Menengah","type":"short","question":"Apa yang sebaiknya kamu lakukan jika berbeda pendapat dengan teman?","options":[],"answer":"Berdiskusi dengan santun dan saling menghargai","explanation":"Perbedaan pendapat sebaiknya dibicarakan dengan tenang dan saling menghormati."},{"id":"ipas3_b3_19","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Manfaat gotong royong","difficulty":"Dasar","type":"short","question":"Sebutkan satu manfaat gotong royong!","options":[],"answer":"Pekerjaan menjadi lebih ringan","explanation":"Gotong royong membantu pekerjaan selesai lebih mudah dan mempererat kebersamaan."},{"id":"ipas3_b3_20","subject":"IPAS","grade":"SD","chapter":"Bab 3: Interaksi Sosial","topic":"Tolong-menolong","difficulty":"Dasar","type":"short","question":"Tuliskan satu contoh sikap tolong-menolong di lingkungan rumah!","options":[],"answer":"Membantu orang tua membersihkan rumah","explanation":"Contoh lain adalah membantu tetangga atau merapikan barang bersama anggota keluarga."}];
+
+const grade3BindoChapter1Questions=[{"id":"bindo3_b1_01","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Mengelompokkan benda berdasarkan ciri","difficulty":"Dasar","type":"mcq","question":"Manakah kelompok benda yang semuanya digunakan untuk bermain di luar rumah?","options":["Bola, layang-layang, tali lompat","Piring, sendok, gelas","Buku, pensil, penghapus","Sabun, sampo, sikat gigi"],"answer":"Bola, layang-layang, tali lompat","explanation":"Bola, layang-layang, dan tali lompat dapat digunakan untuk bermain di luar rumah."},{"id":"bindo3_b1_02","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Mengelompokkan benda berdasarkan bentuk","difficulty":"Dasar","type":"mcq","question":"Manakah kelompok benda yang semuanya berbentuk bulat?","options":["Buku, penggaris, pensil","Kelereng, bola, jeruk","Meja, kursi, lemari","Penghapus, buku, tas"],"answer":"Kelereng, bola, jeruk","explanation":"Kelereng, bola, dan jeruk memiliki bentuk bulat."},{"id":"bindo3_b1_03","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Mengelompokkan benda berdasarkan bahan","difficulty":"Dasar","type":"mcq","question":"Kelompok benda yang semuanya terbuat dari kertas adalah ....","options":["Buku, koran, majalah","Gelas, piring, mangkuk","Pensil, penggaris, meja","Sepatu, topi, tas"],"answer":"Buku, koran, majalah","explanation":"Buku, koran, dan majalah umumnya dibuat dari kertas."},{"id":"bindo3_b1_04","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan huruf kapital","difficulty":"Dasar","type":"mcq","question":"Penulisan huruf kapital yang tepat terdapat pada kalimat ....","options":["aku tinggal di bandung.","Aku tinggal di Bandung.","aku Tinggal di Bandung.","Aku tinggal di bandung."],"answer":"Aku tinggal di Bandung.","explanation":"Huruf pertama kalimat dan nama kota Bandung ditulis dengan huruf kapital."},{"id":"bindo3_b1_05","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan tanda baca","difficulty":"Dasar","type":"mcq","question":"Tanda baca yang tepat untuk mengakhiri kalimat tanya adalah ....","options":["Titik (.)","Koma (,)","Tanda tanya (?)","Tanda seru (!)"],"answer":"Tanda tanya (?)","explanation":"Kalimat yang menanyakan sesuatu diakhiri dengan tanda tanya."},{"id":"bindo3_b1_06","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan tanda baca","difficulty":"Dasar","type":"mcq","question":"Kalimat yang menggunakan tanda titik dengan tepat adalah ....","options":["Siapa namamu.","Ayo bermain!","Ibu memasak nasi.","Di mana rumahmu?"],"answer":"Ibu memasak nasi.","explanation":"Kalimat berita atau pernyataan diakhiri tanda titik."},{"id":"bindo3_b1_07","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan spasi","difficulty":"Dasar","type":"mcq","question":"Penulisan kalimat dengan spasi yang tepat adalah ....","options":["Aku sukabermain bola.","Aku suka bermain bola.","Akusuka bermain bola.","Aku suka bermainbola."],"answer":"Aku suka bermain bola.","explanation":"Setiap kata dalam kalimat dipisahkan dengan spasi."},{"id":"bindo3_b1_08","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Menyampaikan gagasan secara lisan","difficulty":"Menengah","type":"mcq","question":"Kalimat ajakan yang santun kepada teman adalah ....","options":["Kamu harus ikut sekarang!","Ayo, kita bermain bersama!","Jangan banyak bertanya!","Pergi dari sini!"],"answer":"Ayo, kita bermain bersama!","explanation":"Kalimat tersebut mengajak teman dengan bahasa yang ramah dan santun."},{"id":"bindo3_b1_09","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Memahami dan mengikuti instruksi","difficulty":"Dasar","type":"mcq","question":"Ketika guru memberikan instruksi, sikap yang tepat adalah ....","options":["Mendengarkan dan mengikuti petunjuk","Berbicara sendiri","Mengabaikan guru","Mengganggu teman"],"answer":"Mendengarkan dan mengikuti petunjuk","explanation":"Instruksi perlu disimak agar dapat dilakukan dengan benar."},{"id":"bindo3_b1_10","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Mengikuti instruksi berurutan","difficulty":"Menengah","type":"mcq","question":"Guru berkata, 'Ambil buku, buka halaman 10, lalu tulis tanggal hari ini.' Apa yang harus dilakukan pertama kali?","options":["Menulis tanggal","Membuka halaman 10","Mengambil buku","Menutup buku"],"answer":"Mengambil buku","explanation":"Instruksi dilakukan sesuai urutan. Langkah pertama adalah mengambil buku."},{"id":"bindo3_b1_11","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan huruf kapital","difficulty":"Dasar","type":"tf","question":"Nama orang diawali dengan huruf kapital.","options":["Benar","Salah"],"answer":"Benar","explanation":"Nama orang merupakan nama diri sehingga diawali huruf kapital."},{"id":"bindo3_b1_12","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan tanda baca","difficulty":"Dasar","type":"tf","question":"Kalimat tanya diakhiri dengan tanda titik.","options":["Benar","Salah"],"answer":"Salah","explanation":"Kalimat tanya diakhiri tanda tanya (?)."},{"id":"bindo3_b1_13","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan spasi","difficulty":"Dasar","type":"tf","question":"Setiap kata dalam kalimat perlu dipisahkan dengan spasi.","options":["Benar","Salah"],"answer":"Benar","explanation":"Spasi digunakan untuk memisahkan kata agar kalimat mudah dibaca."},{"id":"bindo3_b1_14","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Menyampaikan gagasan secara santun","difficulty":"Menengah","type":"tf","question":"Saat teman menyampaikan pendapat, kita sebaiknya mendengarkan dengan sopan.","options":["Benar","Salah"],"answer":"Benar","explanation":"Mendengarkan dengan baik merupakan sikap santun dalam berkomunikasi."},{"id":"bindo3_b1_15","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Memahami dan mengikuti instruksi","difficulty":"Menengah","type":"tf","question":"Instruksi yang diberikan guru boleh dilakukan secara acak meskipun memiliki urutan.","options":["Benar","Salah"],"answer":"Salah","explanation":"Instruksi berurutan sebaiknya dilakukan sesuai urutan agar hasilnya tepat."},{"id":"bindo3_b1_16","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan huruf kapital dan tanda baca","difficulty":"Menengah","type":"short","question":"Tuliskan kembali kalimat ini dengan huruf kapital dan tanda baca yang tepat: 'siti bermain di taman'","options":[],"answer":"Siti bermain di taman.","explanation":"Huruf pertama kalimat dan nama orang Siti menggunakan huruf kapital. Kalimat berita diakhiri titik."},{"id":"bindo3_b1_17","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Penggunaan tanda baca","difficulty":"Dasar","type":"short","question":"Tanda baca apa yang digunakan pada akhir kalimat 'Siapa nama temanmu'?","options":[],"answer":"Tanda tanya (?)","explanation":"Kalimat tersebut menanyakan sesuatu sehingga diakhiri tanda tanya."},{"id":"bindo3_b1_18","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Mengelompokkan benda berdasarkan ciri","difficulty":"Menengah","type":"short","question":"Sebutkan satu contoh benda yang dapat dikelompokkan berdasarkan warna!","options":[],"answer":"Benda berwarna merah, misalnya apel dan bola merah","explanation":"Benda dapat dikelompokkan berdasarkan ciri yang sama, misalnya warna."},{"id":"bindo3_b1_19","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Memahami dan mengikuti instruksi","difficulty":"Dasar","type":"short","question":"Apa yang sebaiknya kamu lakukan jika guru memberi instruksi untuk merapikan alat tulis?","options":[],"answer":"Mendengarkan lalu merapikan alat tulis sesuai instruksi","explanation":"Instruksi perlu disimak dan dilakukan sesuai petunjuk."},{"id":"bindo3_b1_20","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 1: Ayo Main!","topic":"Menyampaikan gagasan secara lisan","difficulty":"Menengah","type":"short","question":"Tuliskan satu kalimat ajakan yang santun untuk mengajak teman bermain!","options":[],"answer":"Ayo, kita bermain bersama!","explanation":"Kalimat ajakan yang baik menggunakan bahasa ramah dan santun."}];
+
+const grade3BindoChapter2Questions=[{"id":"bindo3_b2_01","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menyimak dan mengikuti petunjuk","difficulty":"Dasar","type":"mcq","question":"Guru memberi petunjuk: 'Buka buku, tulis tanggal, lalu kerjakan nomor satu.' Apa yang dilakukan setelah membuka buku?","options":["Mengerjakan nomor satu","Menulis tanggal","Menutup buku","Mengumpulkan buku"],"answer":"Menulis tanggal","explanation":"Urutan petunjuk adalah membuka buku, menulis tanggal, kemudian mengerjakan nomor satu."},{"id":"bindo3_b2_02","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menyimak dan mengikuti petunjuk","difficulty":"Dasar","type":"mcq","question":"Perhatikan petunjuk berikut: 'Ambil pensil, warnai gambar, kemudian simpan pensil.' Kegiatan terakhir adalah ....","options":["Mengambil pensil","Mewarnai gambar","Menyimpan pensil","Menggambar ulang"],"answer":"Menyimpan pensil","explanation":"Kata 'kemudian' menunjukkan urutan berikutnya. Langkah terakhir adalah menyimpan pensil."},{"id":"bindo3_b2_03","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Memahami pesan pada gambar","difficulty":"Dasar","type":"mcq","question":"Pada gambar, seorang anak membantu temannya memungut buku yang jatuh. Pesan yang tepat dari gambar tersebut adalah ....","options":["Kita harus saling membantu","Kita boleh mengejek teman","Kita harus berebut buku","Kita tidak perlu peduli"],"answer":"Kita harus saling membantu","explanation":"Peristiwa membantu teman menunjukkan sikap peduli dan tolong-menolong."},{"id":"bindo3_b2_04","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Memahami pesan pada gambar","difficulty":"Dasar","type":"mcq","question":"Pada ilustrasi, dua anak bergantian menggunakan ayunan di taman. Pesan yang sesuai adalah ....","options":["Kita harus menyerobot antrean","Kita perlu bergantian dan berbagi","Kita tidak boleh bermain","Kita harus bermain sendiri"],"answer":"Kita perlu bergantian dan berbagi","explanation":"Bergantian menggunakan fasilitas menunjukkan sikap tertib dan menghargai orang lain."},{"id":"bindo3_b2_05","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Memahami pesan pada gambar","difficulty":"Menengah","type":"mcq","question":"Sebuah gambar menunjukkan anak-anak menanam pohon bersama di halaman sekolah. Pesan gambar tersebut adalah ....","options":["Menjaga lingkungan bersama-sama","Merusak tanaman","Membuang sampah sembarangan","Menghindari kerja sama"],"answer":"Menjaga lingkungan bersama-sama","explanation":"Kegiatan menanam pohon bersama mengajarkan kerja sama dan kepedulian terhadap lingkungan."},{"id":"bindo3_b2_06","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"mcq","question":"Bagian awal dalam sebuah cerita biasanya berisi ....","options":["Pengenalan tokoh dan tempat","Penyelesaian masalah saja","Pesan penutup saja","Daftar pertanyaan"],"answer":"Pengenalan tokoh dan tempat","explanation":"Bagian awal memperkenalkan tokoh, tempat, atau keadaan cerita."},{"id":"bindo3_b2_07","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Menengah","type":"mcq","question":"Bagian tengah cerita biasanya berisi ....","options":["Pengenalan judul saja","Peristiwa atau masalah yang dialami tokoh","Nama penulis saja","Kesimpulan tanpa cerita"],"answer":"Peristiwa atau masalah yang dialami tokoh","explanation":"Bagian tengah menceritakan rangkaian kejadian dan masalah yang dihadapi tokoh."},{"id":"bindo3_b2_08","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"mcq","question":"Bagian akhir cerita biasanya berisi ....","options":["Pengenalan tokoh","Awal terjadinya masalah","Penyelesaian atau penutup cerita","Daftar alat"],"answer":"Penyelesaian atau penutup cerita","explanation":"Bagian akhir menunjukkan penyelesaian masalah atau penutup cerita."},{"id":"bindo3_b2_09","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menentukan bagian cerita","difficulty":"Menengah","type":"mcq","question":"Bacalah cerita: 'Pagi hari, Rina membawa bekal ke sekolah. Saat istirahat, ia melihat Dita tidak membawa makanan. Rina membagi bekalnya. Mereka makan bersama dengan gembira.' Peristiwa yang terjadi di bagian tengah adalah ....","options":["Rina membawa bekal ke sekolah","Rina melihat Dita tidak membawa makanan lalu membagi bekalnya","Mereka pulang sekolah","Rina membeli tas baru"],"answer":"Rina melihat Dita tidak membawa makanan lalu membagi bekalnya","explanation":"Bagian tengah berisi kejadian utama, yaitu Dita tidak membawa makanan dan Rina berbagi bekal."},{"id":"bindo3_b2_10","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menentukan bagian cerita","difficulty":"Menengah","type":"mcq","question":"Berdasarkan cerita Rina dan Dita, akhir cerita yang tepat adalah ....","options":["Mereka makan bersama dengan gembira","Rina lupa membawa bekal","Dita pergi meninggalkan Rina","Mereka bertengkar"],"answer":"Mereka makan bersama dengan gembira","explanation":"Kalimat terakhir menunjukkan penutup cerita dan keadaan tokoh setelah saling berbagi."},{"id":"bindo3_b2_11","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menyimak dan mengikuti petunjuk","difficulty":"Dasar","type":"tf","question":"Petunjuk yang diberikan secara berurutan sebaiknya dilakukan sesuai urutannya.","options":["Benar","Salah"],"answer":"Benar","explanation":"Mengikuti urutan petunjuk membantu kita menyelesaikan tugas dengan tepat."},{"id":"bindo3_b2_12","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Memahami pesan pada gambar","difficulty":"Dasar","type":"tf","question":"Pesan dari gambar dapat membantu kita memahami sikap atau peristiwa yang ditunjukkan.","options":["Benar","Salah"],"answer":"Benar","explanation":"Gambar dapat menyampaikan pesan melalui tindakan dan keadaan yang terlihat."},{"id":"bindo3_b2_13","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"tf","question":"Bagian tengah cerita biasanya berisi peristiwa yang dialami tokoh.","options":["Benar","Salah"],"answer":"Benar","explanation":"Bagian tengah memuat rangkaian peristiwa atau masalah dalam cerita."},{"id":"bindo3_b2_14","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Menengah","type":"tf","question":"Bagian awal cerita selalu berisi penyelesaian masalah.","options":["Benar","Salah"],"answer":"Salah","explanation":"Bagian awal biasanya memperkenalkan tokoh dan latar, sedangkan penyelesaian terdapat di bagian akhir."},{"id":"bindo3_b2_15","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"tf","question":"Cerita sederhana dapat disusun dengan urutan awal, tengah, dan akhir.","options":["Benar","Salah"],"answer":"Benar","explanation":"Urutan awal, tengah, dan akhir membuat cerita lebih runtut dan mudah dipahami."},{"id":"bindo3_b2_16","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menyimak dan mengikuti petunjuk","difficulty":"Menengah","type":"short","question":"Guru berkata: 'Ambil buku tulis, tuliskan namamu, lalu kumpulkan di meja guru.' Apa yang harus dilakukan setelah menuliskan nama?","options":[],"answer":"Mengumpulkan buku di meja guru","explanation":"Petunjuk dilakukan berurutan. Setelah menulis nama, buku dikumpulkan di meja guru."},{"id":"bindo3_b2_17","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Memahami pesan pada gambar","difficulty":"Dasar","type":"short","question":"Pada gambar, seorang anak membuang sampah ke tempat sampah. Tuliskan pesan yang dapat diambil dari gambar tersebut!","options":[],"answer":"Kita harus membuang sampah pada tempatnya","explanation":"Tindakan pada gambar mengajarkan kebersihan dan kepedulian terhadap lingkungan."},{"id":"bindo3_b2_18","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"short","question":"Apa yang biasanya dikenalkan pada bagian awal sebuah cerita?","options":[],"answer":"Tokoh dan tempat atau latar cerita","explanation":"Bagian awal mengenalkan tokoh dan latar agar pembaca memahami cerita."},{"id":"bindo3_b2_19","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Menulis cerita sederhana","difficulty":"Menengah","type":"short","question":"Buatlah satu kalimat untuk bagian tengah cerita tentang seorang anak yang kehilangan pensil!","options":[],"answer":"Ia mencari pensilnya di dalam tas dan di bawah meja","explanation":"Bagian tengah berisi peristiwa atau usaha tokoh menghadapi masalah."},{"id":"bindo3_b2_20","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 2: Kawan Seiring","topic":"Struktur cerita sederhana","difficulty":"Dasar","type":"short","question":"Tuliskan urutan tiga bagian cerita sederhana dengan benar!","options":[],"answer":"Awal, tengah, akhir","explanation":"Cerita sederhana disusun secara runtut mulai dari awal, tengah, lalu akhir."}];
+
+const grade3BindoChapter3Questions=[{"id":"bindo3_b3_01","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"mcq","question":"Saat berbicara kepada kepala sekolah, sebaiknya kita menggunakan bahasa yang ....","options":["Santun dan sopan","Kasar dan keras","Seenaknya","Mengejek"],"answer":"Santun dan sopan","explanation":"Bahasa perlu disesuaikan dengan lawan bicara. Kepada kepala sekolah, gunakan bahasa yang santun."},{"id":"bindo3_b3_02","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"mcq","question":"Temanmu sedang menyampaikan pendapat. Sikap yang tepat adalah ....","options":["Memotong pembicaraannya","Mendengarkan sampai selesai","Menertawakannya","Berbicara lebih keras"],"answer":"Mendengarkan sampai selesai","explanation":"Menghargai pembicara berarti mendengarkan dengan baik dan tidak memotong pembicaraan."},{"id":"bindo3_b3_03","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"mcq","question":"Kalimat yang santun untuk meminta bantuan kepada teman adalah ....","options":["Cepat bantu aku!","Tolong bantu aku merapikan buku, ya.","Kamu harus mengerjakannya!","Jangan banyak alasan!"],"answer":"Tolong bantu aku merapikan buku, ya.","explanation":"Kata 'tolong' membuat permintaan terdengar lebih santun."},{"id":"bindo3_b3_04","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Menengah","type":"mcq","question":"Ketika tidak setuju dengan pendapat teman, kita sebaiknya mengatakan ....","options":["Pendapatmu buruk sekali!","Kamu tidak tahu apa-apa!","Menurutku ada pendapat lain yang bisa kita pertimbangkan.","Diam saja kamu!"],"answer":"Menurutku ada pendapat lain yang bisa kita pertimbangkan.","explanation":"Perbedaan pendapat disampaikan dengan kalimat yang menghargai orang lain."},{"id":"bindo3_b3_05","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Menengah","type":"mcq","question":"Bacalah paragraf: 'Setiap Jumat, siswa kelas tiga membersihkan kelas. Ada yang menyapu lantai, menghapus papan tulis, dan merapikan meja. Kelas menjadi bersih dan nyaman.' Gagasan utama paragraf tersebut adalah ....","options":["Siswa kelas tiga membersihkan kelas setiap Jumat","Papan tulis berwarna putih","Meja berada di dalam kelas","Hari Jumat adalah hari libur"],"answer":"Siswa kelas tiga membersihkan kelas setiap Jumat","explanation":"Kalimat-kalimat lain menjelaskan kegiatan membersihkan kelas yang dilakukan siswa setiap Jumat."},{"id":"bindo3_b3_06","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Menengah","type":"mcq","question":"Bacalah paragraf: 'Lebah membantu penyerbukan bunga. Saat mengambil nektar, serbuk sari dapat menempel pada tubuh lebah. Serbuk sari itu kemudian berpindah ke bunga lain.' Gagasan utama paragraf adalah ....","options":["Lebah membantu penyerbukan bunga","Lebah memiliki sayap","Bunga memiliki warna berbeda","Nektar terasa manis"],"answer":"Lebah membantu penyerbukan bunga","explanation":"Kalimat-kalimat penjelas menerangkan cara lebah membantu penyerbukan."},{"id":"bindo3_b3_07","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Menengah","type":"mcq","question":"Bacalah paragraf: 'Olahraga membuat tubuh lebih sehat. Kita dapat berjalan kaki, bersepeda, atau bermain bola. Olahraga sebaiknya dilakukan secara teratur.' Gagasan utama paragraf adalah ....","options":["Bermain bola harus setiap hari","Olahraga membuat tubuh lebih sehat","Sepeda memiliki dua roda","Berjalan kaki melelahkan"],"answer":"Olahraga membuat tubuh lebih sehat","explanation":"Kalimat pertama menjadi pokok pembahasan yang dijelaskan oleh kalimat berikutnya."},{"id":"bindo3_b3_08","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Mengidentifikasi masalah tokoh","difficulty":"Dasar","type":"mcq","question":"Dalam cerita, Danu datang terlambat karena bangun kesiangan. Ia tidak sempat sarapan dan tertinggal pelajaran pertama. Masalah yang dihadapi Danu adalah ....","options":["Danu kehilangan sepeda","Danu datang terlambat ke sekolah","Danu mendapat hadiah","Danu bermain bersama teman"],"answer":"Danu datang terlambat ke sekolah","explanation":"Masalah tokoh adalah kesulitan atau kejadian yang mengganggu tokoh dalam cerita."},{"id":"bindo3_b3_09","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Mengidentifikasi masalah tokoh","difficulty":"Dasar","type":"mcq","question":"Mira melihat tanaman kelasnya layu karena lupa disiram. Apa masalah dalam cerita tersebut?","options":["Tanaman kelas layu","Mira membeli buku","Kelas sedang dihias","Teman Mira sedang membaca"],"answer":"Tanaman kelas layu","explanation":"Tanaman yang layu merupakan masalah yang dialami dalam cerita."},{"id":"bindo3_b3_10","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menjelaskan masalah dan solusi tokoh","difficulty":"Lanjutan","type":"mcq","question":"Beni kehilangan pensil sebelum pelajaran dimulai. Tindakan yang paling tepat untuk mengatasi masalahnya adalah ....","options":["Menuduh semua teman","Memeriksa tempat terakhir ia menggunakan pensil dan meminta bantuan guru jika perlu","Mengganggu teman","Tidak mengikuti pelajaran"],"answer":"Memeriksa tempat terakhir ia menggunakan pensil dan meminta bantuan guru jika perlu","explanation":"Tokoh sebaiknya mencari solusi dengan tenang dan tidak langsung menyalahkan orang lain."},{"id":"bindo3_b3_11","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"tf","question":"Kita perlu menggunakan bahasa yang santun saat berbicara dengan siapa pun.","options":["Benar","Salah"],"answer":"Benar","explanation":"Sikap santun membantu menjaga hubungan baik dengan orang lain."},{"id":"bindo3_b3_12","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Dasar","type":"tf","question":"Gagasan utama adalah pokok pembahasan dalam sebuah paragraf.","options":["Benar","Salah"],"answer":"Benar","explanation":"Gagasan utama menyatakan hal paling penting yang dibahas dalam paragraf."},{"id":"bindo3_b3_13","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Menengah","type":"tf","question":"Kalimat-kalimat penjelas biasanya memberikan rincian tentang gagasan utama.","options":["Benar","Salah"],"answer":"Benar","explanation":"Kalimat penjelas mendukung dan menerangkan pokok pembahasan."},{"id":"bindo3_b3_14","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Mengidentifikasi masalah tokoh","difficulty":"Dasar","type":"tf","question":"Masalah tokoh dalam cerita tidak perlu dipahami oleh pembaca.","options":["Benar","Salah"],"answer":"Salah","explanation":"Memahami masalah tokoh membantu pembaca mengikuti jalan cerita dan memahami tindakan tokoh."},{"id":"bindo3_b3_15","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"tf","question":"Saat berbeda pendapat, kita boleh menyampaikan pendapat dengan menghina teman.","options":["Benar","Salah"],"answer":"Salah","explanation":"Perbedaan pendapat harus disampaikan dengan sopan dan menghargai teman."},{"id":"bindo3_b3_16","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Dasar","type":"short","question":"Tuliskan satu ungkapan santun untuk meminta izin meminjam penghapus teman!","options":[],"answer":"Bolehkah aku meminjam penghapusmu?","explanation":"Ungkapan meminta izin sebaiknya menggunakan kata yang santun, seperti 'bolehkah' atau 'tolong'."},{"id":"bindo3_b3_17","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menemukan gagasan utama","difficulty":"Menengah","type":"short","question":"Bacalah paragraf: 'Perpustakaan sekolah menyediakan banyak buku. Siswa dapat membaca buku cerita dan buku pengetahuan. Perpustakaan menjadi tempat yang menyenangkan untuk belajar.' Tuliskan gagasan utamanya!","options":[],"answer":"Perpustakaan sekolah menyediakan banyak buku","explanation":"Kalimat lainnya menjelaskan jenis buku dan manfaat perpustakaan."},{"id":"bindo3_b3_18","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Mengidentifikasi masalah tokoh","difficulty":"Dasar","type":"short","question":"Bacalah cerita: 'Sari ingin mengikuti lomba menggambar. Namun, pensil warnanya tertinggal di rumah. Ia lalu meminjam pensil warna milik sekolah.' Apa masalah yang dialami Sari?","options":[],"answer":"Pensil warna Sari tertinggal di rumah","explanation":"Masalah tokoh adalah pensil warna yang dibutuhkan untuk lomba tertinggal."},{"id":"bindo3_b3_19","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Menjelaskan masalah dan solusi tokoh","difficulty":"Menengah","type":"short","question":"Berdasarkan cerita Sari, bagaimana cara Sari mengatasi masalahnya?","options":[],"answer":"Sari meminjam pensil warna milik sekolah","explanation":"Jawaban diambil dari tindakan tokoh setelah menghadapi masalah."},{"id":"bindo3_b3_20","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 3: Pengobar Semangat","topic":"Berbicara santun sesuai konteks","difficulty":"Menengah","type":"short","question":"Mengapa kita harus mendengarkan pendapat teman sampai selesai?","options":[],"answer":"Agar kita menghargai teman dan memahami pendapatnya","explanation":"Mendengarkan sampai selesai merupakan bentuk sikap santun dan menghargai orang lain."}];
+
+const grade3BindoChapter4Questions=[{"id":"bindo3_b4_01","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Dasar","type":"mcq","question":"Temanmu berkata, 'Menurutku taman sekolah perlu ditanami bunga.' Tanggapan yang santun adalah ....","options":["Idemu jelek!","Aku setuju, bunga dapat membuat taman lebih indah.","Tidak usah bicara!","Pendapatmu tidak penting."],"answer":"Aku setuju, bunga dapat membuat taman lebih indah.","explanation":"Tanggapan yang baik menyatakan pendapat dengan sopan dan memberikan alasan sederhana."},{"id":"bindo3_b4_02","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Menengah","type":"mcq","question":"Jika kamu memiliki pendapat berbeda dari teman, kalimat yang tepat adalah ....","options":["Kamu pasti salah!","Aku punya pendapat berbeda. Menurutku, kita bisa menanam pohon juga.","Pendapatmu tidak masuk akal!","Aku tidak mau mendengarkan."],"answer":"Aku punya pendapat berbeda. Menurutku, kita bisa menanam pohon juga.","explanation":"Kalimat tersebut menyampaikan perbedaan pendapat tanpa merendahkan teman."},{"id":"bindo3_b4_03","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Dasar","type":"mcq","question":"Saat teman menyampaikan pendapat, kita sebaiknya ....","options":["Mendengarkan dengan baik","Memotong pembicaraan","Bermain sendiri","Menertawakan pendapatnya"],"answer":"Mendengarkan dengan baik","explanation":"Mendengarkan merupakan bentuk menghargai pendapat orang lain."},{"id":"bindo3_b4_04","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menilai gambar dan penggunaan warna","difficulty":"Dasar","type":"mcq","question":"Sebuah ilustrasi memperlihatkan langit berwarna biru, rumput hijau, dan matahari kuning. Alasan penggunaan warna tersebut adalah ....","options":["Membuat gambar tampak sesuai dengan keadaan alam","Membuat semua benda sulit dikenali","Menghilangkan suasana gambar","Membuat gambar tidak menarik"],"answer":"Membuat gambar tampak sesuai dengan keadaan alam","explanation":"Warna yang sesuai membantu pembaca mengenali objek dan memahami ilustrasi."},{"id":"bindo3_b4_05","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menilai gambar dan penggunaan warna","difficulty":"Dasar","type":"mcq","question":"Pada gambar, seorang anak menolong temannya yang terjatuh. Penilaian yang tepat terhadap isi gambar adalah ....","options":["Gambar menunjukkan sikap saling menolong","Gambar mengajarkan mengejek teman","Gambar menunjukkan sikap tidak peduli","Gambar mengajak bertengkar"],"answer":"Gambar menunjukkan sikap saling menolong","explanation":"Tindakan menolong teman menyampaikan pesan kepedulian."},{"id":"bindo3_b4_06","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menilai gambar dan penggunaan warna","difficulty":"Menengah","type":"mcq","question":"Mengapa warna yang digunakan dalam ilustrasi perlu diperhatikan?","options":["Agar gambar membantu menyampaikan suasana dan pesan","Agar semua gambar memiliki warna sama","Agar objek tidak terlihat","Agar gambar menjadi sulit dipahami"],"answer":"Agar gambar membantu menyampaikan suasana dan pesan","explanation":"Warna dapat membantu memperjelas objek dan suasana ilustrasi."},{"id":"bindo3_b4_07","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Gagasan utama dan pendukung","difficulty":"Menengah","type":"mcq","question":"Bacalah paragraf: 'Membaca buku memiliki banyak manfaat. Kita dapat memperoleh pengetahuan baru. Membaca juga menambah kosakata dan melatih daya pikir.' Gagasan utama paragraf adalah ....","options":["Membaca buku memiliki banyak manfaat","Kosakata sulit ditemukan","Buku hanya untuk hiburan","Daya pikir tidak perlu dilatih"],"answer":"Membaca buku memiliki banyak manfaat","explanation":"Kalimat berikutnya menjelaskan beberapa manfaat membaca buku."},{"id":"bindo3_b4_08","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Gagasan utama dan pendukung","difficulty":"Menengah","type":"mcq","question":"Berdasarkan paragraf tentang manfaat membaca, salah satu gagasan pendukungnya adalah ....","options":["Membaca menambah kosakata","Buku harus berwarna merah","Semua orang memiliki buku yang sama","Membaca membuat kita berhenti belajar"],"answer":"Membaca menambah kosakata","explanation":"Gagasan pendukung memberikan rincian yang menjelaskan gagasan utama."},{"id":"bindo3_b4_09","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menulis kesimpulan","difficulty":"Menengah","type":"mcq","question":"Bacalah paragraf: 'Kita harus menjaga kebersihan gigi. Sikatlah gigi dua kali sehari. Kurangi makanan yang terlalu manis dan periksakan gigi secara teratur.' Kesimpulan yang tepat adalah ....","options":["Gigi tidak perlu dirawat","Kebersihan gigi perlu dijaga dengan kebiasaan baik","Makanan manis harus dimakan setiap hari","Sikat gigi hanya dilakukan saat sakit"],"answer":"Kebersihan gigi perlu dijaga dengan kebiasaan baik","explanation":"Kesimpulan merangkum isi paragraf, yaitu pentingnya menjaga kebersihan gigi."},{"id":"bindo3_b4_10","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyusun paragraf secara runtut","difficulty":"Lanjutan","type":"mcq","question":"Urutan yang tepat untuk menulis paragraf sederhana adalah ....","options":["Gagasan utama, gagasan pendukung, kesimpulan","Kesimpulan, judul, lalu gagasan utama","Gagasan pendukung saja","Kesimpulan berulang-ulang"],"answer":"Gagasan utama, gagasan pendukung, kesimpulan","explanation":"Susunan ini membuat isi paragraf tersusun runtut dan mudah dipahami."},{"id":"bindo3_b4_11","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Dasar","type":"tf","question":"Kita boleh menyampaikan pendapat dengan sopan meskipun berbeda dengan pendapat teman.","options":["Benar","Salah"],"answer":"Benar","explanation":"Perbedaan pendapat dapat disampaikan dengan santun dan saling menghargai."},{"id":"bindo3_b4_12","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Dasar","type":"tf","question":"Mendengarkan pendapat teman sampai selesai merupakan sikap menghargai.","options":["Benar","Salah"],"answer":"Benar","explanation":"Memberi kesempatan teman berbicara menunjukkan sikap menghormati."},{"id":"bindo3_b4_13","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menilai gambar dan penggunaan warna","difficulty":"Dasar","type":"tf","question":"Warna dalam ilustrasi dapat membantu menunjukkan suasana gambar.","options":["Benar","Salah"],"answer":"Benar","explanation":"Warna dapat mendukung suasana dan memperjelas pesan ilustrasi."},{"id":"bindo3_b4_14","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Gagasan utama dan pendukung","difficulty":"Menengah","type":"tf","question":"Gagasan pendukung berisi keterangan yang menjelaskan gagasan utama.","options":["Benar","Salah"],"answer":"Benar","explanation":"Gagasan pendukung memberikan rincian atau contoh dari pokok pembahasan."},{"id":"bindo3_b4_15","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menulis kesimpulan","difficulty":"Dasar","type":"tf","question":"Kesimpulan yang baik tidak perlu sesuai dengan isi paragraf.","options":["Benar","Salah"],"answer":"Salah","explanation":"Kesimpulan harus merangkum dan sesuai dengan informasi dalam paragraf."},{"id":"bindo3_b4_16","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menyampaikan dan menanggapi pendapat","difficulty":"Dasar","type":"short","question":"Tuliskan satu kalimat santun untuk menanggapi pendapat teman yang mengusulkan kerja bakti di kelas!","options":[],"answer":"Aku setuju, kerja bakti dapat membuat kelas menjadi bersih dan nyaman.","explanation":"Tanggapan santun dapat berisi persetujuan dan alasan yang relevan."},{"id":"bindo3_b4_17","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menilai gambar dan penggunaan warna","difficulty":"Menengah","type":"short","question":"Mengapa warna yang sesuai dapat membuat ilustrasi lebih mudah dipahami?","options":[],"answer":"Karena warna membantu memperjelas objek dan suasana gambar.","explanation":"Jawaban menjelaskan fungsi warna dalam mendukung pesan ilustrasi."},{"id":"bindo3_b4_18","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Gagasan utama dan pendukung","difficulty":"Menengah","type":"short","question":"Bacalah paragraf: 'Air sangat penting bagi tubuh. Air membantu menjaga suhu tubuh. Air juga diperlukan agar tubuh tidak kekurangan cairan.' Tuliskan gagasan utamanya!","options":[],"answer":"Air sangat penting bagi tubuh","explanation":"Kalimat lainnya menjelaskan manfaat air bagi tubuh."},{"id":"bindo3_b4_19","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Gagasan utama dan pendukung","difficulty":"Menengah","type":"short","question":"Berdasarkan paragraf tentang pentingnya air, tuliskan satu gagasan pendukung!","options":[],"answer":"Air membantu menjaga suhu tubuh","explanation":"Gagasan pendukung merupakan rincian yang menjelaskan gagasan utama."},{"id":"bindo3_b4_20","subject":"Bahasa Indonesia","grade":"SD","chapter":"Bab 4: Senyum di Sekitarku","topic":"Menulis kesimpulan","difficulty":"Lanjutan","type":"short","question":"Bacalah paragraf: 'Setiap pagi, siswa menyiram tanaman di halaman sekolah. Mereka juga mencabut rumput liar. Tanaman tumbuh subur dan halaman terlihat asri.' Tuliskan kesimpulan paragraf tersebut!","options":[],"answer":"Siswa merawat tanaman agar halaman sekolah tetap subur dan asri","explanation":"Kesimpulan merangkum kegiatan dan hasil yang dijelaskan dalam paragraf."}];
+
+const grade3MathVariedQuestions=[{"id":"math3_var_match_01","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Dasar","type":"match","question":"Pasangkan angka dengan nilai tempatnya!","pairs":[{"left":"Angka 4 pada 462","right":"Ratusan"},{"left":"Angka 6 pada 462","right":"Puluhan"},{"left":"Angka 2 pada 462","right":"Satuan"}],"matchOptions":["Satuan","Puluhan","Ratusan"],"answer":{"Angka 4 pada 462":"Ratusan","Angka 6 pada 462":"Puluhan","Angka 2 pada 462":"Satuan"},"explanation":"Pada bilangan 462, angka 4 menempati ratusan, 6 puluhan, dan 2 satuan."},{"id":"math3_var_match_02","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan","topic":"Operasi hitung","difficulty":"Dasar","type":"match","question":"Pasangkan operasi hitung dengan hasil yang tepat!","pairs":[{"left":"120 + 30","right":"150"},{"left":"200 - 50","right":"150"},{"left":"45 + 20","right":"65"}],"matchOptions":["65","150","170"],"answer":{"120 + 30":"150","200 - 50":"150","45 + 20":"65"},"explanation":"120 + 30 = 150, 200 - 50 = 150, dan 45 + 20 = 65."},{"id":"math3_var_match_03","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian","topic":"Perkalian sebagai penjumlahan berulang","difficulty":"Dasar","type":"match","question":"Pasangkan perkalian dengan penjumlahan berulang yang sesuai!","pairs":[{"left":"3 × 4","right":"4 + 4 + 4"},{"left":"2 × 5","right":"5 + 5"},{"left":"4 × 2","right":"2 + 2 + 2 + 2"}],"matchOptions":["5 + 5","2 + 2 + 2 + 2","4 + 4 + 4"],"answer":{"3 × 4":"4 + 4 + 4","2 × 5":"5 + 5","4 × 2":"2 + 2 + 2 + 2"},"explanation":"Perkalian dapat dimaknai sebagai penjumlahan berulang dengan bilangan yang sama."},{"id":"math3_var_order_01","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Mengurutkan bilangan","difficulty":"Dasar","type":"order","question":"Urutkan bilangan berikut dari yang terkecil ke terbesar!","items":["305","153","250"],"answer":["153","250","305"],"explanation":"Bandingkan angka ratusan terlebih dahulu: 1 ratusan, 2 ratusan, lalu 3 ratusan."},{"id":"math3_var_order_02","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan","topic":"Langkah penjumlahan","difficulty":"Menengah","type":"order","question":"Urutkan langkah menyelesaikan 125 + 34 dengan benar!","items":["Jumlahkan puluhan: 2 puluhan + 3 puluhan = 5 puluhan","Jumlahkan satuan: 5 satuan + 4 satuan = 9 satuan","Gabungkan hasilnya menjadi 159"],"answer":["Jumlahkan satuan: 5 satuan + 4 satuan = 9 satuan","Jumlahkan puluhan: 2 puluhan + 3 puluhan = 5 puluhan","Gabungkan hasilnya menjadi 159"],"explanation":"Penjumlahan dapat dilakukan dari satuan, puluhan, lalu gabungkan dengan nilai ratusan. 125 + 34 = 159."},{"id":"math3_var_order_03","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian","topic":"Pembagian sebagai pengelompokan","difficulty":"Dasar","type":"order","question":"Urutkan langkah membagi 12 permen sama rata kepada 3 anak!","items":["Setiap anak menerima 4 permen","Siapkan 12 permen","Bagikan permen satu demi satu secara merata"],"answer":["Siapkan 12 permen","Bagikan permen satu demi satu secara merata","Setiap anak menerima 4 permen"],"explanation":"Dua belas permen dibagikan sama rata kepada tiga anak. Setiap anak mendapat 12 ÷ 3 = 4 permen."},{"id":"math3_var_multi_01","subject":"Matematika","grade":"SD","chapter":"Bab 1: Bilangan Cacah sampai 1.000","topic":"Nilai tempat","difficulty":"Menengah","type":"multi","question":"Pilih semua pernyataan yang benar tentang bilangan 572!","options":["Angka 5 bernilai 500","Angka 7 menempati puluhan","Angka 2 menempati satuan","Angka 7 bernilai 7"],"answer":["Angka 5 bernilai 500","Angka 7 menempati puluhan","Angka 2 menempati satuan"],"explanation":"Bilangan 572 terdiri atas 5 ratusan, 7 puluhan, dan 2 satuan. Nilai angka 7 adalah 70."},{"id":"math3_var_multi_02","subject":"Matematika","grade":"SD","chapter":"Bab 2: Penjumlahan dan Pengurangan","topic":"Memilih operasi hitung","difficulty":"Menengah","type":"multi","question":"Di perpustakaan ada 125 buku cerita dan 80 buku pengetahuan. Pilih semua pernyataan yang benar!","options":["Jumlah seluruh buku adalah 205","Operasi yang digunakan untuk mencari jumlah adalah penjumlahan","Selisih kedua jenis buku adalah 45","Jumlah seluruh buku adalah 215"],"answer":["Jumlah seluruh buku adalah 205","Operasi yang digunakan untuk mencari jumlah adalah penjumlahan","Selisih kedua jenis buku adalah 45"],"explanation":"125 + 80 = 205. Selisihnya 125 - 80 = 45. Pernyataan tentang jumlah 215 tidak tepat."},{"id":"math3_var_multi_03","subject":"Matematika","grade":"SD","chapter":"Bab 3: Perkalian dan Pembagian","topic":"Fakta perkalian dan pembagian","difficulty":"Dasar","type":"multi","question":"Pilih semua kalimat matematika yang hasilnya 12!","options":["3 × 4","6 + 6","24 ÷ 2","15 - 2"],"answer":["3 × 4","6 + 6","24 ÷ 2"],"explanation":"3 × 4 = 12, 6 + 6 = 12, dan 24 ÷ 2 = 12. Sementara 15 - 2 = 13."}];
+
+try{
+ const grade3SeedIds=new Set([...grade3MathChapter1Questions,...grade3MathChapter2Questions,...grade3MathChapter3Questions,...grade3MathChapter4Questions,...grade3IPASChapter1Questions,...grade3IPASChapter2Questions,...grade3IPASChapter3Questions,...grade3BindoChapter1Questions,...grade3BindoChapter2Questions,...grade3BindoChapter3Questions,...grade3BindoChapter4Questions,...grade3MathVariedQuestions].map(q=>q.id));
+ questionBank=questionBank.map(q=>grade3SeedIds.has(q.id)?{...q,classLevel:3}:q);
+ const existingIds=new Set(questionBank.map(q=>q.id));
+ const newItems=[...grade3MathChapter1Questions,...grade3MathChapter2Questions,...grade3MathChapter3Questions,...grade3MathChapter4Questions,...grade3IPASChapter1Questions,...grade3IPASChapter2Questions,...grade3IPASChapter3Questions,...grade3BindoChapter1Questions,...grade3BindoChapter2Questions,...grade3BindoChapter3Questions,...grade3BindoChapter4Questions,...grade3MathVariedQuestions].map(q=>({...q,classLevel:3})).filter(q=>!existingIds.has(q.id));
+ if(newItems.length){
+  questionBank=questionBank.concat(newItems);
+  localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));
+ }
+}catch(e){}
+
 let learningProgress={completed:0,bestScore:0,correct:0,attempts:0};
 try{learningProgress={...learningProgress,...JSON.parse(localStorage.getItem('alfajar_learning_progress')||'{}')};}catch(e){}
 
@@ -3341,17 +3484,30 @@ function learningHub(){
  <div class="grid grid-cols-2 gap-3 mb-3">
   <label class="text-xs font-extrabold text-blue-100">MATA PELAJARAN<select id="quizSubject" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${subjects.map(x=>`<option>${safeText(x)}</option>`).join('')}</select></label>
   <label class="text-xs font-extrabold text-blue-100">JENJANG<select id="quizGrade" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option ${selectedGrade==='SD'?'selected':''}>SD</option><option ${selectedGrade==='SMP'?'selected':''}>SMP</option><option ${selectedGrade==='SMA/SMK'?'selected':''}>SMA/SMK</option></select></label>
+  <label class="text-xs font-extrabold text-blue-100 col-span-2">BAB / MATERI<select id="quizChapter" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="">Semua bab</option>${[...new Set(questionBank.filter(q=>q.subject===subjects[0]&&q.grade==='SD'&&q.chapter).map(q=>q.chapter))].map(c=>`<option value="${safeText(c)}">${safeText(c)}</option>`).join('')}</select></label>
   <label class="text-xs font-extrabold text-blue-100 col-span-2">TINGKAT KESULITAN<select id="quizDifficulty" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="Semua">Semua tingkat</option><option>Dasar</option><option>Menengah</option><option>Lanjutan</option></select></label>
  </div>
  <div class="rounded-xl bg-white/10 p-3 flex justify-between text-sm mb-4"><span><i class="fa-solid fa-award text-amber-300 mr-1"></i> Kuis selesai</span><b>${learningProgress.completed}</b><span>Skor terbaik</span><b>${learningProgress.bestScore}%</b></div>
  <button id="startQuizBtn" class="w-full bg-emerald-500 hover:bg-emerald-400 rounded-xl py-3 font-extrabold"><i class="fa-solid fa-play mr-2"></i>MULAI KUIS</button>
+ <button id="openChallengeHubBtn" class="w-full mt-2 bg-amber-500 text-slate-900 rounded-xl py-3 font-extrabold"><i class="fa-solid fa-trophy mr-2"></i>ARENA TANTANGAN</button>
+ <button id="openMaterialHubBtn" class="w-full mt-2 bg-sky-500 rounded-xl py-3 font-extrabold"><i class="fa-solid fa-book-open mr-2"></i>RUANG MATERI</button>
  <button id="learningPathBtn" class="w-full mt-2 bg-violet-500 rounded-xl py-3 font-extrabold"><i class="fa-solid fa-route mr-2"></i>JALUR BELAJAR & TUJUAN</button>
  <button id="tutorOpenBtn" class="w-full mt-2 bg-sky-600 rounded-xl py-3 font-extrabold"><i class="fa-solid fa-robot mr-2"></i>PAKAR BELAJAR & REKOMENDASI</button>
  <button id="teacherBankBtn" class="w-full mt-2 bg-white/10 hover:bg-white/20 rounded-xl py-3 font-bold"><i class="fa-solid fa-file-import mr-2"></i>BUKA DASHBOARD GURU</button>
  <p class="text-[11px] text-blue-200 mt-3">Siswa dapat mengatur profil melalui Portal Siswa. Guru dapat mengelola kelas dan bank soal melalui Dashboard Guru.</p>`);
  setTimeout(()=>{
+  const subjectEl=document.getElementById('quizSubject'),gradeEl=document.getElementById('quizGrade'),chapterEl=document.getElementById('quizChapter');
+  const syncChapters=()=>{
+   const s=subjectEl.value,g=gradeEl.value,previous=chapterEl.value;
+   const chapters=[...new Set(questionBank.filter(q=>q.subject===s&&q.grade===g&&q.chapter).map(q=>q.chapter))];
+   chapterEl.innerHTML='<option value="">Semua bab</option>'+chapters.map(c=>`<option value="${safeText(c)}">${safeText(c)}</option>`).join('');
+   if(chapters.includes(previous))chapterEl.value=previous;
+  };
+  subjectEl.onchange=syncChapters;gradeEl.onchange=syncChapters;syncChapters();
   const start=document.getElementById('startQuizBtn');
-  if(start)start.onclick=()=>startQuiz(document.getElementById('quizSubject').value,document.getElementById('quizGrade').value,document.getElementById('quizDifficulty').value);
+  if(start)start.onclick=()=>startQuiz(subjectEl.value,gradeEl.value,document.getElementById('quizDifficulty').value, null, chapterEl.value||null);
+  const challenge=document.getElementById('openChallengeHubBtn');if(challenge)challenge.onclick=()=>{selectedGrade=gradeEl.value;try{localStorage.setItem('alfajar_selected_grade',selectedGrade);}catch(e){}openChallengeHub(subjectEl.value);};
+  const materialBtn=document.getElementById('openMaterialHubBtn');if(materialBtn)materialBtn.onclick=()=>{selectedGrade=gradeEl.value;try{localStorage.setItem('alfajar_selected_grade',selectedGrade);}catch(e){}openMaterialHub();};
   const path=document.getElementById('learningPathBtn');if(path)path.onclick=()=>learningPathPanel(document.getElementById('quizSubject').value,document.getElementById('quizGrade').value);
   const tutor=document.getElementById('tutorOpenBtn');if(tutor)tutor.onclick=tutorPanel;
   const teacher=document.getElementById('teacherBankBtn');if(teacher)teacher.onclick=teacherQuestionBank;
@@ -3476,8 +3632,153 @@ function exportResultsCSV(){
  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='rekap_al_fajar_edugame.csv';a.click();URL.revokeObjectURL(url);
 }
-function startQuiz(subject,grade,difficulty='Semua',topic=null){
- const pool=questionBank.filter(q=>q.subject===subject&&q.grade===grade&&(difficulty==='Semua'||(q.difficulty||'Dasar')===difficulty)&&(!topic||topicOf(q)===topic));
+
+
+const builtInLessons={
+ 'Matematika|SD':[
+  {chapter:'Bab 1: Bilangan Cacah sampai 1.000',icon:'fa-hashtag',color:'sky',goal:'Membaca, menulis, membandingkan, dan menguraikan bilangan sampai 1.000.',sections:[
+   ['Mengenal bilangan','Bilangan cacah digunakan untuk menyatakan banyak benda atau urutan. Contoh: 248 dibaca dua ratus empat puluh delapan.'],
+   ['Nilai tempat','Pada bilangan 248, angka 2 bernilai 200 (ratusan), angka 4 bernilai 40 (puluhan), dan angka 8 bernilai 8 (satuan).'],
+   ['Bentuk panjang','248 dapat diuraikan menjadi 200 + 40 + 8. Bentuk ini membantu kita memahami nilai setiap angka.'],
+   ['Membandingkan bilangan','Bandingkan mulai dari angka ratusan. Jika sama, bandingkan puluhan, lalu satuan. Contoh: 248 lebih kecil dari 253 karena 4 puluhan lebih kecil dari 5 puluhan.'],
+   ['Mengurutkan bilangan','Untuk mengurutkan dari terkecil, letakkan bilangan dengan nilai paling kecil terlebih dahulu. Contoh: 125, 215, 251.']
+  ],examples:[['Tuliskan bentuk panjang dari 376.','300 + 70 + 6'],['Manakah yang lebih besar, 409 atau 390?','409, karena 4 ratusan lebih besar dari 3 ratusan.']]},
+  {chapter:'Bab 2: Penjumlahan dan Pengurangan',icon:'fa-plus-minus',color:'emerald',goal:'Menggunakan penjumlahan dan pengurangan bilangan sampai 1.000 dalam situasi sehari-hari.',sections:[
+   ['Penjumlahan','Penjumlahan menggabungkan dua kelompok atau lebih. Contoh: 125 + 34 = 159.'],
+   ['Menghitung bertahap','Kita dapat menjumlahkan satuan, puluhan, lalu ratusan. Perhatikan nilai tempat agar tidak tertukar.'],
+   ['Pengurangan','Pengurangan digunakan untuk mencari sisa atau selisih. Contoh: 175 − 23 = 152.'],
+   ['Meminjam','Jika angka satuan yang dikurangi lebih kecil, kita dapat menukar 1 puluhan menjadi 10 satuan. Lakukan dengan memperhatikan nilai tempat.'],
+   ['Soal cerita','Baca informasi penting, tentukan apakah mencari jumlah atau sisa, lalu pilih operasi hitung yang sesuai.']
+  ],examples:[['Di rak ada 135 buku. Datang lagi 20 buku. Berapa jumlahnya?','135 + 20 = 155 buku.'],['Ada 180 kelereng. Sebanyak 45 diberikan. Berapa sisanya?','180 − 45 = 135 kelereng.']]},
+  {chapter:'Bab 3: Perkalian dan Pembagian',icon:'fa-times',color:'violet',goal:'Memahami perkalian sebagai penjumlahan berulang dan pembagian sebagai membagi sama rata.',sections:[
+   ['Perkalian','Perkalian dapat berarti penjumlahan berulang. Contoh: 3 × 4 berarti 4 + 4 + 4 = 12.'],
+   ['Kelompok sama banyak','Jika ada 4 piring dan setiap piring berisi 2 kue, jumlah kue adalah 4 × 2 = 8.'],
+   ['Pembagian','Pembagian dapat digunakan untuk membagi benda sama rata. Contoh: 12 permen dibagikan kepada 3 anak, setiap anak mendapat 12 ÷ 3 = 4 permen.'],
+   ['Hubungan operasi','Perkalian dan pembagian saling berhubungan. Jika 3 × 4 = 12, maka 12 ÷ 3 = 4 dan 12 ÷ 4 = 3.'],
+   ['Memeriksa jawaban','Periksa pembagian dengan perkalian. Jika 12 ÷ 3 = 4, maka 4 × 3 harus sama dengan 12.']
+  ],examples:[['Ada 5 kantong. Setiap kantong berisi 3 jeruk. Berapa jeruk semuanya?','5 × 3 = 15 jeruk.'],['Sebanyak 20 pensil dibagikan sama rata kepada 4 siswa. Berapa pensil setiap siswa?','20 ÷ 4 = 5 pensil.']]},
+  {chapter:'Bab 4: Kalimat Matematika Penjumlahan dan Pengurangan',icon:'fa-equals',color:'amber',goal:'Membuat dan menyelesaikan kalimat matematika penjumlahan atau pengurangan, termasuk bilangan yang belum diketahui.',sections:[
+   ['Kalimat matematika','Kalimat matematika menggunakan angka dan tanda operasi untuk menyatakan suatu hubungan. Contoh: 25 + 10 = 35.'],
+   ['Bilangan yang belum diketahui','Kotak dapat digunakan untuk mewakili bilangan yang belum diketahui. Contoh: 12 + □ = 20.'],
+   ['Mencari bilangan yang hilang','Untuk 12 + □ = 20, hitung 20 − 12. Jadi, bilangan yang hilang adalah 8.'],
+   ['Memilih operasi','Kata seperti “bertambah” atau “seluruhnya” sering menunjukkan penjumlahan. Kata “tersisa” atau “selisih” sering menunjukkan pengurangan. Tetap pahami cerita secara utuh.'],
+   ['Memeriksa hasil','Masukkan jawaban ke kalimat matematika semula untuk memastikan kedua sisi sama.']
+  ],examples:[['Lengkapi: 35 + □ = 50.','50 − 35 = 15, jadi kotaknya 15.'],['Lengkapi: 72 − □ = 40.','72 − 40 = 32, jadi kotaknya 32.']]}
+ ]
+};
+function openMaterialHub(placeName=null){
+ const grade=selectedGrade||'SD';
+ const lessonSubjects=selectedClass===3?Object.keys(builtInLessons).filter(k=>k.endsWith('|'+grade)).map(k=>k.split('|')[0]):[];
+ const teacherList=(teacherMaterials||[]).filter(m=>(!m.grade||m.grade===grade)&&(!m.classLevel||Number(m.classLevel)===selectedClass));
+ const available=[...new Set([...lessonSubjects,...teacherList.map(m=>m.subject||'Materi Guru')])];
+ const cards=available.map(subject=>{
+  const built=builtInLessons[subject+'|'+grade]||[];
+  const custom=teacherList.filter(m=>m.subject===subject);
+  return `<div class="rounded-2xl bg-white/10 border border-white/10 p-3 mb-3"><div class="flex items-center justify-between gap-2 mb-2"><b class="text-lg">${safeText(subject)}</b><span class="text-xs text-blue-200">${built.length+custom.length} materi</span></div>
+  ${built.map((l,i)=>`<button class="openBuiltLesson w-full text-left rounded-xl bg-slate-900/50 hover:bg-slate-800 p-3 mb-2 flex items-center gap-3" data-subject="${safeText(subject)}" data-index="${i}"><span class="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center"><i class="fa-solid ${l.icon} text-sky-200"></i></span><span class="flex-1"><b class="block text-sm">${safeText(l.chapter)}</b><small class="text-blue-200">${safeText(l.goal)}</small></span><i class="fa-solid fa-chevron-right text-blue-200"></i></button>`).join('')}
+  ${custom.map((m)=>`<div class="rounded-xl bg-slate-900/50 p-3 mb-2"><b class="text-sm">${safeText(m.title)}</b><p class="text-xs text-blue-200 mt-1 whitespace-pre-wrap">${safeText(String(m.content||'').slice(0,240))}</p>${m.url?`<a class="text-xs text-cyan-200 underline" target="_blank" rel="noopener" href="${safeText(m.url)}">Buka sumber</a>`:''}</div>`).join('')}
+  </div>`;
+ }).join('');
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-book-open text-sky-300 mr-2"></i>RUANG MATERI</div>
+ <p class="text-sm text-blue-100 mb-3">${placeName?'Selamat datang di '+safeText(placeName)+'. ':''}Pelajari materi sesuai jenjang yang sedang dipilih.</p>
+ <div class="flex items-center justify-between rounded-xl bg-white/10 p-3 mb-3"><div><small class="text-blue-200">JENJANG AKTIF</small><b class="block">${safeText(grade)}</b></div><span class="text-xs text-blue-200">Materi tersedia: ${available.length}</span></div>
+ ${cards||'<div class="rounded-xl bg-white/10 p-4 text-sm text-blue-100">Belum ada materi untuk jenjang ini. Guru dapat menambahkan materi melalui Mode Guru.</div>'}
+ <p class="text-[11px] text-blue-200">Materi bawaan saat ini tersedia untuk Matematika SD Kelas 3. Materi jenjang atau mata pelajaran lain dapat ditambahkan guru melalui Mode Guru.</p>`);
+ setTimeout(()=>document.querySelectorAll('.openBuiltLesson').forEach(b=>b.onclick=()=>openLessonDetail(b.dataset.subject,Number(b.dataset.index))),0);
+}
+
+function lessonVisualActivity(index){
+ const activities=[
+  {title:'Jelajah nilai tempat',visual:`<div class="flex justify-center gap-2 my-3">${[['2','RATUSAN','200'],['4','PULUHAN','40'],['8','SATUAN','8']].map(([n,l,v])=>`<div class="rounded-xl bg-slate-900/70 border border-sky-300/30 p-3 text-center min-w-[76px]"><b class="block text-3xl text-amber-300">${n}</b><small class="block text-[10px] text-blue-100">${l}</small><b class="text-sm text-emerald-300">${v}</b></div>`).join('')}</div>`,question:'Pada bilangan 462, berapakah nilai angka 6?',options:['6','60','600'],answer:'60',explain:'Angka 6 berada di tempat puluhan, jadi nilainya 6 × 10 = 60.'},
+  {title:'Mesin penjumlahan',visual:`<div class="flex items-center justify-center gap-2 my-4"><div class="rounded-xl bg-sky-500/20 p-3 text-center"><b class="text-2xl">125</b><small class="block text-xs">Mula-mula</small></div><i class="fa-solid fa-plus text-amber-300 text-xl"></i><div class="rounded-xl bg-emerald-500/20 p-3 text-center"><b class="text-2xl">30</b><small class="block text-xs">Ditambahkan</small></div><i class="fa-solid fa-arrow-right text-amber-300"></i><div class="rounded-xl bg-violet-500/20 p-3 text-center"><b class="text-2xl">?</b><small class="block text-xs">Jumlah</small></div></div>`,question:'Berapakah hasil 125 + 30?',options:['145','155','165'],answer:'155',explain:'125 + 30 = 125 + 20 + 10 = 155.'},
+  {title:'Kelompok sama banyak',visual:`<div class="grid grid-cols-4 gap-2 my-4">${Array.from({length:4},(_,i)=>`<div class="rounded-xl bg-violet-500/15 border border-violet-300/20 p-2 text-center"><small class="block text-xs text-violet-100">Kelompok ${i+1}</small><div class="text-xl leading-relaxed">🍎 🍎 🍎</div></div>`).join('')}</div><p class="text-center text-sm text-blue-100">4 kelompok · setiap kelompok berisi 3 apel</p>`,question:'Berapa jumlah semua apel?',options:['7','12','16'],answer:'12',explain:'Ada 4 kelompok, masing-masing 3 apel. Jadi 4 × 3 = 12 apel.'},
+  {title:'Lengkapi kalimat matematika',visual:`<div class="flex items-center justify-center gap-3 my-4"><div class="rounded-xl bg-sky-500/20 p-4 text-2xl font-extrabold">18</div><span class="text-2xl">+</span><div class="rounded-xl bg-amber-400/20 border-2 border-dashed border-amber-300 p-4 text-2xl font-extrabold text-amber-200">?</div><span class="text-2xl">=</span><div class="rounded-xl bg-emerald-500/20 p-4 text-2xl font-extrabold">25</div></div>`,question:'Bilangan berapakah yang tepat untuk mengisi kotak?',options:['5','7','8'],answer:'7',explain:'25 − 18 = 7. Jadi, 18 + 7 = 25.'}
+ ];
+ const a=activities[index]||activities[0];
+ return `<div class="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 p-3 my-4"><div class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i><b>${a.title}</b></div>${a.visual}<div class="border-t border-white/10 pt-3"><p class="font-bold text-sm mb-2">${a.question}</p><div class="grid grid-cols-3 gap-2">${a.options.map((v,i)=>`<button class="lessonActivityOption rounded-xl bg-white/10 hover:bg-sky-500/30 border border-white/10 p-3 font-extrabold" data-value="${v}">${v}</button>`).join('')}</div><p id="lessonActivityFeedback" class="hidden text-sm mt-3 rounded-xl p-3"></p></div></div>`;
+}
+function openLessonDetail(subject,index){
+ const lesson=(builtInLessons[subject+'|'+selectedGrade]||[])[index];if(!lesson)return;
+ const body=lesson.sections.map((s,i)=>`<section class="rounded-xl bg-white/10 p-3 mb-2"><div class="flex gap-2 items-center mb-1"><span class="text-amber-300 font-extrabold">${i+1}.</span><b>${safeText(s[0])}</b></div><p class="text-sm text-blue-50 leading-relaxed">${safeText(s[1])}</p></section>`).join('');
+ const examples=lesson.examples.map((e,i)=>`<div class="rounded-xl bg-sky-500/15 p-3 mb-2"><b class="text-sm">Contoh ${i+1}</b><p class="text-sm mt-1">${safeText(e[0])}</p><button class="showExampleAnswer text-xs text-cyan-200 underline mt-2" data-i="${i}">Lihat pembahasan</button><p class="exampleAnswer hidden text-sm text-emerald-200 mt-2">${safeText(e[1])}</p></div>`).join('');
+ openModal(`<button id="backMaterialHub" class="text-xs text-cyan-200 mb-3"><i class="fa-solid fa-arrow-left mr-1"></i>Kembali ke Ruang Materi</button><div class="brand text-xl font-bold mb-1">${safeText(lesson.chapter)}</div><p class="text-sm text-blue-100 mb-3"><b>Tujuan belajar:</b> ${safeText(lesson.goal)}</p><div class="bar mb-3"><i style="width:100%"></i></div><h3 class="font-extrabold mb-2">PELAJARI MATERI</h3>${body}<h3 class="font-extrabold mt-4 mb-2">VISUALISASI DAN AKTIVITAS</h3>${lessonVisualActivity(index)}<h3 class="font-extrabold mt-4 mb-2">CONTOH DAN PEMBAHASAN</h3>${examples}<button id="lessonPractice" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold"><i class="fa-solid fa-gamepad mr-2"></i>LATIHAN BAB INI</button>`);
+ setTimeout(()=>{
+  const back=document.getElementById('backMaterialHub');if(back)back.onclick=()=>openMaterialHub();
+  document.querySelectorAll('.showExampleAnswer').forEach(b=>b.onclick=()=>document.querySelectorAll('.exampleAnswer')[Number(b.dataset.i)].classList.toggle('hidden'));
+  document.querySelectorAll('.lessonActivityOption').forEach(b=>b.onclick=()=>{
+   const a=[{answer:'60',explain:'Angka 6 berada di tempat puluhan, jadi nilainya 60.'},{answer:'155',explain:'125 + 30 = 155.'},{answer:'12',explain:'4 kelompok × 3 apel = 12 apel.'},{answer:'7',explain:'25 − 18 = 7.'}][index]||{answer:'60',explain:'Perhatikan kembali contoh pada materi.'};
+   const good=b.dataset.value===a.answer,fb=document.getElementById('lessonActivityFeedback');
+   fb.classList.remove('hidden');fb.className='text-sm mt-3 rounded-xl p-3 '+(good?'bg-emerald-500/20 text-emerald-100':'bg-amber-500/20 text-amber-100');
+   fb.textContent=(good?'Hebat! Jawabanmu benar. ':'Belum tepat. Yuk coba pahami lagi. ')+a.explain;
+   document.querySelectorAll('.lessonActivityOption').forEach(x=>x.disabled=true);
+  });
+  const practice=document.getElementById('lessonPractice');if(practice)practice.onclick=()=>{const chapter=lesson.chapter;const pool=questionBank.filter(q=>q.subject===subject&&questionFitsClass(q,selectedGrade,selectedClass)&&q.chapter===chapter);if(!pool.length){showToast('Latihan untuk bab ini belum tersedia.');return;}closeModal();startQuiz(subject,selectedGrade,'Semua',null,chapter);};
+ },0);
+}
+
+
+function questionFitsClass(q,grade=selectedGrade,cls=selectedClass){
+ if(q.grade!==grade)return false;
+ const qClass=Number(q.classLevel||q.kelas||q.class||0);
+ // Seeded Grade 3 bank is explicitly tagged; teacher-authored questions can set classLevel.
+ // Untagged legacy questions remain available as general practice for the selected school level.
+ return !qClass||qClass===Number(cls);
+}
+function questionsForSelection(){return questionBank.filter(q=>questionFitsClass(q));}
+function classLabel(){return 'Kelas '+selectedClass;}
+function openChallengeHub(prefSubject=null){
+ const grades=['SD','SMP','SMA/SMK'];
+ const getSubjects=g=>[...new Set(questionBank.filter(q=>questionFitsClass(q,g,selectedClass)).map(q=>q.subject))].sort();
+ const getChapters=(s,g)=>[...new Set(questionBank.filter(q=>questionFitsClass(q,g,selectedClass)&&q.subject===s&&q.chapter).map(q=>q.chapter))];
+ const count=(s,c,g)=>questionBank.filter(q=>questionFitsClass(q,g,selectedClass)&&q.subject===s&&(!c||q.chapter===c)).length;
+ const initialSubjects=getSubjects(selectedGrade),initial=(prefSubject&&initialSubjects.includes(prefSubject))?prefSubject:(initialSubjects[0]||'');
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-trophy text-amber-300 mr-2"></i>ARENA TANTANGAN</div>
+ <p class="text-sm text-blue-100 mb-4">Tantangan difilter berdasarkan jenjang dan kelas. Soal khusus kelas lain tidak akan dicampur.</p>
+ <div class="grid grid-cols-2 gap-2 mb-3">
+ <label class="text-xs font-bold text-blue-100">JENJANG<select id="challengeGrade" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${grades.map(g=>`<option ${g===selectedGrade?'selected':''}>${g}</option>`).join('')}</select></label>
+ <label class="text-xs font-bold text-blue-100">MATA PELAJARAN<select id="challengeSubject" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${initialSubjects.map(s=>`<option ${s===initial?'selected':''}>${safeText(s)}</option>`).join('')}</select></label>
+ <label class="col-span-2 text-xs font-bold text-blue-100">BAB / MATERI<select id="challengeChapter" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="">Semua bab</option>${getChapters(initial,selectedGrade).map(c=>`<option>${safeText(c)}</option>`).join('')}</select></label></div>
+ <div class="rounded-xl bg-sky-500/15 p-3 text-xs text-blue-100 mb-2">Kelas aktif: <b>Kelas ${selectedClass}</b></div><div id="challengeAvailability" class="rounded-xl bg-white/10 p-3 text-xs text-blue-100 mb-3"></div>
+ <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+ <button data-mode="kilat" class="challengeMode bg-sky-600 rounded-xl p-3 text-left"><b>⚡ Tantangan Kilat</b><small class="block text-blue-100 mt-1">5 soal · latihan cepat</small></button>
+ <button data-mode="campuran" class="challengeMode bg-violet-600 rounded-xl p-3 text-left"><b>🧩 Tantangan Campuran</b><small class="block text-violet-100 mt-1">10 soal · beragam topik</small></button>
+ <button data-mode="fokus" class="challengeMode bg-emerald-600 rounded-xl p-3 text-left"><b>🎯 Tantangan Fokus Bab</b><small class="block text-emerald-100 mt-1">10 soal · satu bab pilihan</small></button>
+ <button data-mode="maraton" class="challengeMode bg-amber-500 text-slate-900 rounded-xl p-3 text-left"><b>🏆 Tantangan Maraton</b><small class="block text-slate-800 mt-1">15 soal · uji ketekunan</small></button></div>
+ <p class="text-[11px] text-blue-200 mt-3">Jika soal pada jenjang tertentu belum tersedia, game tidak menggantinya dengan soal jenjang lain.</p>`);
+ setTimeout(()=>{
+  const $=id=>document.getElementById(id),g=$('challengeGrade'),s=$('challengeSubject'),c=$('challengeChapter'),info=$('challengeAvailability');
+  const sync=()=>{
+   const list=getSubjects(g.value),old=s.value;s.innerHTML=list.map(x=>`<option>${safeText(x)}</option>`).join('');if(list.includes(old))s.value=old;
+   const ch=getChapters(s.value,g.value);c.innerHTML='<option value="">Semua bab</option>'+ch.map(x=>`<option>${safeText(x)}</option>`).join('');
+   info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value||'jenjang ini'} · ${g.value}.`;
+  };
+  g.onchange=()=>{
+  selectedGrade=g.value;selectedClass=g.value==='SD'?3:g.value==='SMP'?7:10;
+  try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+  const classBadge=document.querySelector('#challengeAvailability')?.previousElementSibling;
+  if(classBadge)classBadge.innerHTML='Kelas aktif: <b>Kelas '+selectedClass+'</b>';
+  sync();
+ };s.onchange=()=>{const ch=getChapters(s.value,g.value);c.innerHTML='<option value="">Semua bab</option>'+ch.map(x=>`<option>${safeText(x)}</option>`).join('');info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value} · ${g.value}.`;};
+  c.onchange=()=>info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value} · ${g.value}.`;sync();
+  document.querySelectorAll('.challengeMode').forEach(b=>b.onclick=()=>{
+   const mode=b.dataset.mode,chapter=c.value||null,pool=questionBank.filter(q=>q.subject===s.value&&questionFitsClass(q,g.value,selectedClass)&&(!chapter||q.chapter===chapter)),needed=mode==='kilat'?5:mode==='maraton'?15:10;
+   if(!pool.length){showToast('Belum ada soal untuk jenjang dan materi ini.');return;}
+   if(mode==='fokus'&&!chapter){showToast('Pilih satu bab terlebih dahulu.');return;}
+   selectedGrade=g.value;try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+   closeModal();startChallengeRun(s.value,g.value,chapter,mode,needed);
+  });
+ },0);
+}
+function startChallengeRun(subject,grade,chapter,mode,count){
+ const pool=questionBank.filter(q=>q.subject===subject&&questionFitsClass(q,grade,selectedClass)&&(!chapter||q.chapter===chapter));
+ if(!pool.length){showToast('Belum ada soal yang sesuai.');return;}
+ const shuffled=pool.slice().sort(()=>Math.random()-.5).slice(0,Math.min(count,pool.length));
+ quizState={subject,grade,difficulty:'Tantangan',questions:shuffled,index:0,score:0,correct:0,combo:0,remaining:mode==='kilat'?15:20,answered:false,mode,chapter};
+ renderQuizQuestion();
+}
+
+function startQuiz(subject,grade,difficulty='Semua',topic=null,chapter=null){
+ const pool=questionBank.filter(q=>q.subject===subject&&questionFitsClass(q,grade,selectedClass)&&(difficulty==='Semua'||(q.difficulty||'Dasar')===difficulty)&&(!topic||topicOf(q)===topic)&&(!chapter||q.chapter===chapter));
  if(!pool.length){showToast('Belum ada soal untuk pilihan tersebut. Guru dapat menambahkan soal.');return;}
  const shuffled=pool.slice().sort(()=>Math.random()-.5).slice(0,Math.min(10,pool.length));
  quizState={subject,grade,difficulty,questions:shuffled,index:0,score:0,correct:0,combo:0,remaining:20,answered:false};
@@ -3487,9 +3788,13 @@ function renderQuizQuestion(){
  if(quizTimer)clearInterval(quizTimer);
  const q=quizState.questions[quizState.index];quizState.remaining=20;quizState.answered=false;
  const total=quizState.questions.length,idx=quizState.index;
- const options=q.type==='short'?`<input id="shortAnswer" class="w-full rounded-xl bg-slate-800 border border-white/20 p-3 text-white" placeholder="Ketik jawabanmu..."><button id="submitShort" class="w-full bg-sky-500 rounded-xl p-3 font-extrabold mt-2">KIRIM JAWABAN</button>`:
- q.options.map((v,i)=>`<button class="quizOption w-full text-left bg-white/10 hover:bg-white/20 border border-white/10 p-3 rounded-xl" data-answer="${safeText(v)}"><span class="text-amber-300 font-extrabold mr-2">${String.fromCharCode(65+i)}.</span>${safeText(v)}</button>`).join('');
- openModal(`<div class="flex justify-between items-center mb-3"><div><div class="brand text-xl font-bold">${safeText(quizState.subject)}</div><div class="text-xs text-blue-200">${safeText(quizState.grade)} · Soal ${idx+1}/${total}</div></div><div class="text-right"><div class="text-xs text-blue-200">WAKTU</div><b id="quizClock" class="text-2xl text-amber-300">20</b></div></div>
+ let options='';
+ if(q.type==='short')options=`<input id="shortAnswer" class="w-full rounded-xl bg-slate-800 border border-white/20 p-3 text-white" placeholder="Ketik jawabanmu..."><button id="submitShort" class="w-full bg-sky-500 rounded-xl p-3 font-extrabold mt-2">KIRIM JAWABAN</button>`;
+ else if(q.type==='match')options=`<div class="space-y-2">${q.pairs.map((p,i)=>`<label class="block rounded-xl bg-white/10 p-3 text-sm"><span class="block font-bold mb-2">${safeText(p.left)}</span><select class="matchSelect w-full rounded-lg bg-slate-800 p-2 text-white" data-left="${safeText(p.left)}"><option value="">Pilih pasangan</option>${q.matchOptions.map(x=>`<option>${safeText(x)}</option>`).join('')}</select></label>`).join('')}<button id="submitMatch" class="w-full bg-sky-500 rounded-xl p-3 font-extrabold">KIRIM PASANGAN</button></div>`;
+ else if(q.type==='order')options=`<p class="text-xs text-blue-100 mb-2">Pilih urutan yang benar untuk setiap langkah.</p><div class="space-y-2">${q.items.map((item,i)=>`<label class="flex items-center gap-2 rounded-xl bg-white/10 p-3"><span class="flex-1 text-sm">${safeText(item)}</span><select class="orderSelect bg-slate-800 text-white rounded-lg p-2" data-item="${i}">${Array.from({length:q.items.length},(_,n)=>`<option value="${n+1}">${n+1}</option>`).join('')}</select></label>`).join('')}<button id="submitOrder" class="w-full bg-sky-500 rounded-xl p-3 font-extrabold">KIRIM URUTAN</button></div>`;
+ else if(q.type==='multi')options=`<p class="text-xs text-blue-100 mb-2">Pilih semua jawaban yang benar.</p><div class="space-y-2">${q.options.map((v,i)=>`<label class="flex items-center gap-3 bg-white/10 p-3 rounded-xl"><input type="checkbox" class="multiSelect accent-amber-400 w-5 h-5" value="${safeText(v)}"><span>${safeText(v)}</span></label>`).join('')}<button id="submitMulti" class="w-full bg-sky-500 rounded-xl p-3 font-extrabold">KIRIM JAWABAN</button></div>`;
+ else options=q.options.map((v,i)=>`<button class="quizOption w-full text-left bg-white/10 hover:bg-white/20 border border-white/10 p-3 rounded-xl" data-answer="${safeText(v)}"><span class="text-amber-300 font-extrabold mr-2">${String.fromCharCode(65+i)}.</span>${safeText(v)}</button>`).join('');
+ openModal(`<div class="flex justify-between items-center mb-3"><div><div class="brand text-xl font-bold">${safeText(quizState.subject)}</div><div class="text-xs text-blue-200">${safeText(quizState.grade)} · ${quizState.mode?`Tantangan ${safeText(quizState.mode)} · `:''}Soal ${idx+1}/${total}</div></div><div class="text-right"><div class="text-xs text-blue-200">WAKTU</div><b id="quizClock" class="text-2xl text-amber-300">20</b></div></div>
  <div class="bar mb-4"><i style="width:${(idx/total)*100}%"></i></div><div class="text-lg font-extrabold leading-snug mb-4">${safeText(q.question)}</div>
  <div id="quizOptions" class="space-y-2">${options}</div>
  <button id="tutorHintBtn" class="w-full mt-3 bg-violet-600/80 rounded-xl p-2 text-xs font-bold"><i class="fa-solid fa-lightbulb mr-1"></i>MINTA PETUNJUK TUTOR</button>
@@ -3500,6 +3805,9 @@ function renderQuizQuestion(){
  const submit=val=>answerQuestion(val);
  document.querySelectorAll('.quizOption').forEach(b=>b.onclick=()=>submit(b.dataset.answer));
  const shortBtn=document.getElementById('submitShort');if(shortBtn)shortBtn.onclick=()=>submit(document.getElementById('shortAnswer').value);
+ const matchBtn=document.getElementById('submitMatch');if(matchBtn)matchBtn.onclick=()=>{const v={};document.querySelectorAll('.matchSelect').forEach(x=>v[x.dataset.left]=x.value);submit(v);};
+ const orderBtn=document.getElementById('submitOrder');if(orderBtn)orderBtn.onclick=()=>{const v=Array(q.items.length);document.querySelectorAll('.orderSelect').forEach(x=>v[Number(x.value)-1]=q.items[Number(x.dataset.item)]);submit(v);};
+ const multiBtn=document.getElementById('submitMulti');if(multiBtn)multiBtn.onclick=()=>submit([...document.querySelectorAll('.multiSelect:checked')].map(x=>x.value));
  quizTimer=setInterval(()=>{
   if(!quizState||quizState.answered){clearInterval(quizTimer);return;}
   quizState.remaining--;const clockEl=document.getElementById('quizClock');if(clockEl)clockEl.textContent=quizState.remaining;
@@ -3510,7 +3818,11 @@ function answerQuestion(value){
  if(!quizState||quizState.answered)return;
  quizState.answered=true;if(quizTimer)clearInterval(quizTimer);
  const q=quizState.questions[quizState.index];
- const normalize=v=>String(v??'').trim().toLocaleLowerCase('id-ID');
+ const normalize=v=>{
+  if(Array.isArray(v))return JSON.stringify(q.type==='multi'?v.map(x=>String(x).trim().toLocaleLowerCase('id-ID')).sort():v.map(x=>String(x).trim().toLocaleLowerCase('id-ID')));
+  if(v&&typeof v==='object')return JSON.stringify(Object.keys(v).sort().reduce((o,k)=>(o[k]=String(v[k]).trim().toLocaleLowerCase('id-ID'),o),{}));
+  return String(v??'').trim().toLocaleLowerCase('id-ID');
+ };
  const correct=normalize(value)!=='__timeout__'&&normalize(value)===normalize(q.answer);
  if(correct){playGameSfx('correct');quizState.correct++;quizState.combo++;quizState.score+=10+Math.min(quizState.combo,5)*2;}
  else{
@@ -3520,8 +3832,10 @@ function answerQuestion(value){
  }
  const feedback=document.getElementById('quizFeedback');feedback.classList.remove('hidden');
  feedback.className='mt-3 rounded-xl p-3 text-sm '+(correct?'bg-emerald-500/20 border border-emerald-300/30':'bg-rose-500/20 border border-rose-300/30');
- feedback.innerHTML=`<b>${correct?'Tepat sekali!':'Belum tepat.'}</b><p class="mt-1">${safeText(q.explanation)}</p><p class="mt-1 text-xs">Jawaban: <b>${safeText(q.answer)}</b></p>`;
+ const answerLabel=Array.isArray(q.answer)?q.answer.join(' → '):(q.answer&&typeof q.answer==='object'?Object.entries(q.answer).map(([k,v])=>k+' = '+v).join('; '):q.answer);
+ feedback.innerHTML=`<b>${correct?'Tepat sekali!':'Belum tepat.'}</b><p class="mt-1">${safeText(q.explanation)}</p><p class="mt-1 text-xs">Jawaban: <b>${safeText(answerLabel)}</b></p>`;
  document.querySelectorAll('.quizOption').forEach(b=>{b.disabled=true;if(normalize(b.dataset.answer)===normalize(q.answer))b.classList.add('bg-emerald-500/30','border-emerald-300');});
+ document.querySelectorAll('.matchSelect,.orderSelect,.multiSelect,#submitMatch,#submitOrder,#submitMulti').forEach(el=>el.disabled=true);
  const short=document.getElementById('shortAnswer');if(short)short.disabled=true;
  const submit=document.getElementById('submitShort');if(submit)submit.disabled=true;
  document.getElementById('quizScore').textContent=quizState.score;document.getElementById('quizCombo').textContent=quizState.combo;
@@ -3676,6 +3990,7 @@ function applyAvatarLook(){
  torso.scale.y=isFemale?1.02:1;
  cap.visible=avatarState.wear==='Topi';glasses.visible=avatarState.wear==='Kacamata';backpack.visible=avatarState.wear==='Tas';
  try{localStorage.setItem('alfajar_avatar_v21',JSON.stringify(avatarState));}catch(e){}
+ if(typeof updatePlayerNameTag==='function')updatePlayerNameTag();
 }
 function saveOwnedItems(){try{localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));}catch(e){}}
 
@@ -3907,7 +4222,7 @@ function openRoomMaterials(room){
  <div class="text-xs font-extrabold text-sky-200 mb-2">KOLEKSI MATERI GURU</div>
  <div class="space-y-2 max-h-56 overflow-y-auto">${mats.length?mats.map((m,i)=>`<details class="bg-white/10 rounded-xl p-3"><summary class="font-bold text-sm cursor-pointer">${safeText(m.title)} <span class="text-[10px] text-blue-200">· ${safeText(m.subject)}</span></summary><p class="text-sm text-blue-100 mt-2 whitespace-pre-wrap">${safeText(m.content)}</p>${m.url?`<a href="${safeText(m.url)}" target="_blank" rel="noopener" class="text-xs text-cyan-200 underline">Buka sumber belajar</a>`:''}</details>`).join(''):'<p class="text-xs text-blue-100 bg-white/10 rounded-xl p-3">Belum ada koleksi materi tambahan. Guru dapat menambahkannya melalui Dashboard Guru.</p>'}</div>
  <button id="roomReadDone" class="w-full mt-3 bg-sky-500 rounded-xl p-3 font-extrabold">SELESAI MEMBACA · +5 XP</button>`);
- setTimeout(()=>{const b=document.getElementById('roomReadDone');if(b)b.onclick=()=>{addXP(5);closeModal();};},0);
+ setTimeout(()=>{const b=document.getElementById('roomReadDone');if(b)b.onclick=()=>{awardUniqueXP('library-reading-'+String(room).toLowerCase().replace(/[^a-z0-9]+/g,'-'),5);closeModal();};},0);
 }
 function startRoomActivity(room){
  const questions=roomSetFor(room);let index=0,correct=0,locked=false;
@@ -3973,6 +4288,168 @@ function openLearningSimulation(){
   $('simClose').onclick=closeModal;
  },0);
 }
+
+/* v15.6 — Misi penjelajah kota: collectible 3D + tantangan kontekstual */
+let cityQuest=null;
+
+function createCityQuestGuide(){
+ if(cityQuest?.active){openCityQuestPanel();return;}
+ if(window.citySubjectNPCs?.length){openDailyMissionBoard();return;}
+ const configs=[
+  {subject:'Matematika',name:'Kak Raka',emoji:'🔢',color:0x0e7490,cap:0xfbbf24,dx:-5,dz:-4,desc:'Penjaga angka dan pola bilangan'},
+  {subject:'IPAS',name:'Kak Sari',emoji:'🌱',color:0x15803d,cap:0xfde68a,dx:0,dz:-7,desc:'Penjelajah alam dan makhluk hidup'},
+  {subject:'Bahasa Indonesia',name:'Kak Naya',emoji:'📚',color:0x6d28d9,cap:0xf9a8d4,dx:5,dz:-4,desc:'Sahabat cerita dan kata'}
+ ];
+ window.citySubjectNPCs=configs.map((c,i)=>{
+  const g=new THREE.Group();
+  const robe=new THREE.Mesh(new THREE.BoxGeometry(.76,1.08,.5),new THREE.MeshStandardMaterial({color:c.color,roughness:.82}));
+  robe.position.y=1.05;g.add(robe);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,16,12),new THREE.MeshStandardMaterial({color:0xd9a17d}));
+  head.position.y=1.85;g.add(head);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(.39,.42,.14,16),new THREE.MeshStandardMaterial({color:c.cap}));
+  cap.position.y=2.17;g.add(cap);
+  const emblem=new THREE.Mesh(new THREE.TorusGeometry(.48,.045,8,24),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.3}));
+  emblem.position.y=2.65;g.add(emblem);
+  const badge=new THREE.Mesh(new THREE.BoxGeometry(.25,.25,.06),new THREE.MeshStandardMaterial({color:c.cap,emissive:c.cap,emissiveIntensity:.2}));
+  badge.position.set(0,1.35,.29);g.add(badge);
+  g.position.set(player.position.x+c.dx,0,player.position.z+c.dz);
+  scene.add(g);return {...c,group:g,talked:false};
+ });
+ window.cityQuestGuide=window.citySubjectNPCs[0]?.group||null;
+ openModal(`<div class="text-center"><div class="text-5xl">🧑‍🏫</div><h2 class="brand text-2xl font-bold mt-2">PARA PENJAGA KOTA</h2><p class="text-blue-100 my-3">Tiga sahabat belajar telah hadir di kota! Temui setiap NPC untuk menerima misi sesuai mata pelajarannya.</p><div class="text-left rounded-xl bg-white/10 p-3 text-sm space-y-2"><p>🔢 <b>Kak Raka</b> — Matematika</p><p>🌱 <b>Kak Sari</b> — IPAS</p><p>📚 <b>Kak Naya</b> — Bahasa Indonesia</p></div><button id="npcsReady" class="w-full bg-emerald-500 rounded-xl p-3 mt-4 font-bold">Ayo jelajahi kota!</button></div>`);
+ setTimeout(()=>{document.getElementById('npcsReady').onclick=closeModal;},0);
+}
+function openGuideMission(subject,npcName){
+ if(cityQuest?.active){openCityQuestPanel();return;}
+ const info={
+  'Matematika':{icon:'🔢',desc:'Tantangan bilangan, operasi hitung, dan pemecahan masalah.',hint:'Ingat cara menghitung dengan kelompok, menjumlahkan puluhan, dan membagi sama rata.'},
+  'IPAS':{icon:'🌱',desc:'Tantangan tubuh manusia, makhluk hidup, dan lingkungan.',hint:'Perhatikan fungsi pancaindra, urutan daur hidup, dan sikap baik saat berinteraksi.'},
+  'Bahasa Indonesia':{icon:'📚',desc:'Tantangan kosakata, huruf kapital, dan pemahaman bacaan.',hint:'Baca setiap kalimat dengan teliti. Perhatikan huruf awal kalimat, nama tempat, dan makna kata.'}
+ };
+ const d=info[subject]||info.Matematika;
+ function showMain(){
+  openModal(`<div class="text-center"><div class="text-5xl">${d.icon}</div><h2 class="brand text-2xl font-bold mt-2">${npcName||'PENJAGA KOTA'}</h2><p class="text-blue-100 my-3">"Halo, penjelajah! Siap menguji pengetahuanmu dalam misi ${subject}?"</p><div class="rounded-xl bg-white/10 p-3 text-sm">${d.desc}<p class="mt-2">Temukan tiga benda 3D dan selesaikan tantangannya.</p></div><button id="npcAcceptMission" class="w-full bg-emerald-500 rounded-xl p-3 mt-4 font-bold">Terima misi</button><button id="npcAskHint" class="w-full bg-sky-600/70 rounded-xl p-3 mt-2 font-bold">Minta petunjuk</button><button id="npcCancelMission" class="w-full bg-white/10 rounded-xl p-3 mt-2">Nanti dulu</button></div>`);
+  setTimeout(()=>{
+   document.getElementById('npcAcceptMission').onclick=()=>startCityExplorerQuest(subject);
+   document.getElementById('npcAskHint').onclick=()=>{
+    openModal(`<div class="text-center"><div class="text-5xl">💡</div><h2 class="brand text-xl font-bold mt-2">PETUNJUK DARI ${npcName||'PENJAGA KOTA'}</h2><p class="text-blue-100 my-4">${d.hint}</p><button id="hintBack" class="w-full bg-sky-500 rounded-xl p-3 font-bold">Kembali ke dialog</button><button id="hintStart" class="w-full bg-emerald-500 rounded-xl p-3 mt-2 font-bold">Mulai misi</button></div>`);
+    setTimeout(()=>{document.getElementById('hintBack').onclick=showMain;document.getElementById('hintStart').onclick=()=>startCityExplorerQuest(subject);},0);
+   };
+   document.getElementById('npcCancelMission').onclick=closeModal;
+  },0);
+ }
+ showMain();
+}
+function dailyMissionState(){
+ const today=new Date().toLocaleDateString('en-CA');
+ let state={date:today,completed:[]};
+ try{const saved=JSON.parse(localStorage.getItem('alfajar_daily_learning_missions')||'null');if(saved?.date===today)state=saved;}catch(e){}
+ return state;
+}
+function saveDailyMissionState(state){try{localStorage.setItem('alfajar_daily_learning_missions',JSON.stringify(state));}catch(e){}}
+function openDailyMissionBoard(){
+ const state=dailyMissionState();
+ const missions=[
+  {id:'math',icon:'🔢',title:'Selesaikan misi Matematika',desc:'Temui Kak Raka dan selesaikan 3 tantangan.'},
+  {id:'ipas',icon:'🌱',title:'Selesaikan misi IPAS',desc:'Temui Kak Sari dan selesaikan 3 tantangan.'},
+  {id:'bindo',icon:'📚',title:'Selesaikan misi Bahasa Indonesia',desc:'Temui Kak Naya dan selesaikan 3 tantangan.'}
+ ];
+ openModal(`<div class="flex justify-between items-center"><button id="dailyBack" class="text-cyan-200 text-sm">← Mini-game</button><span class="text-xs text-amber-200">MISI HARIAN</span></div><div class="text-center my-3"><div class="text-5xl">📅</div><h2 class="brand text-2xl font-bold">PAPAN MISI HARIAN</h2><p class="text-sm text-blue-100">Target belajar diperbarui setiap hari.</p></div><div class="space-y-2">${missions.map(m=>`<div class="rounded-xl bg-white/10 p-3 flex gap-3 items-center"><span class="text-2xl">${m.icon}</span><div class="flex-1"><b class="text-sm">${m.title}</b><p class="text-xs text-blue-200">${m.desc}</p></div><span>${state.completed.includes(m.id)?'✅':'🔒'}</span></div>`).join('')}</div><div class="rounded-xl bg-amber-500/15 p-3 mt-3 text-sm"><b class="text-amber-200">Hadiah harian</b><p class="text-blue-100">Selesaikan ketiga misi untuk bonus 50 XP.</p><p class="mt-1">Progres: ${state.completed.length}/3</p></div>`);
+ setTimeout(()=>{
+  document.getElementById('dailyBack').onclick=openMiniGameHub;
+  const content=document.getElementById('modalContent');
+  const launch=document.createElement('button');launch.className='w-full bg-emerald-500 rounded-xl p-3 mt-3 font-bold';launch.textContent=window.citySubjectNPCs?.length?'Kembali temui para NPC':'Panggil para NPC ke kota';
+  launch.onclick=()=>{closeModal();if(!window.citySubjectNPCs?.length)createCityQuestGuide();else showToast('Temui Kak Raka, Kak Sari, atau Kak Naya di dekat area awal.');};
+  content.appendChild(launch);
+ },0);
+}
+function startCityExplorerQuest(subject='Matematika'){
+ if(cityQuest?.active){openCityQuestPanel();return;}
+ const banks={
+  'Matematika':[
+   {emoji:'🟦',label:'Balok biru',q:'Ada 3 kotak. Setiap kotak berisi 4 buku. Berapa jumlah buku semuanya?',opts:['7','12','14'],ans:'12',why:'3 kelompok × 4 buku = 12 buku.'},
+   {emoji:'🟨',label:'Bintang emas',q:'Kamu memiliki 250 koin lalu mendapat 30 koin lagi. Berapa jumlahnya?',opts:['270','280','290'],ans:'280',why:'250 + 30 = 280.'},
+   {emoji:'🟥',label:'Kubus merah',q:'Ada 18 permen dibagikan sama banyak kepada 3 anak. Setiap anak mendapat ...',opts:['5','6','7'],ans:'6',why:'18 dibagi 3 sama dengan 6.'}
+  ],
+  'IPAS':[
+   {emoji:'🟦',label:'Balok biru',q:'Bagian tubuh yang membantu kita melihat adalah ....',opts:['Telinga','Mata','Hidung'],ans:'Mata',why:'Mata merupakan indra penglihatan.'},
+   {emoji:'🟨',label:'Bintang emas',q:'Urutan pertumbuhan kupu-kupu yang benar setelah telur adalah ....',opts:['Ulat','Kepompong','Kupu-kupu'],ans:'Ulat',why:'Siklus hidup kupu-kupu dimulai dari telur, ulat, kepompong, lalu kupu-kupu.'},
+   {emoji:'🟥',label:'Kubus merah',q:'Ketika teman sedang berbicara, sikap yang baik adalah ....',opts:['Menyela','Mendengarkan','Pergi begitu saja'],ans:'Mendengarkan',why:'Mendengarkan menunjukkan sikap menghargai orang lain.'}
+  ],
+  'Bahasa Indonesia':[
+   {emoji:'🟦',label:'Balok biru',q:'Kalimat yang menggunakan huruf kapital dengan tepat adalah ....',opts:['aku tinggal di bandung.','Aku tinggal di Bandung.','aku Tinggal di Bandung.'],ans:'Aku tinggal di Bandung.',why:'Huruf kapital digunakan pada awal kalimat dan nama tempat.'},
+   {emoji:'🟨',label:'Bintang emas',q:'Lawan kata “rajin” adalah ....',opts:['Tekun','Malas','Pandai'],ans:'Malas',why:'Malas merupakan antonim dari rajin.'},
+   {emoji:'🟥',label:'Kubus merah',q:'Bacalah: “Dina menyiram tanaman setiap pagi.” Apa yang dilakukan Dina?',opts:['Menanam pohon','Menyiram tanaman','Memetik bunga'],ans:'Menyiram tanaman',why:'Informasi jawaban tertulis langsung pada kalimat.'}
+  ]
+ };
+ const tasks=banks[subject]||banks.Matematika;
+ tasks.forEach((t,i)=>{t.x=player.position.x+[-5,5,1][i];t.z=player.position.z+[-4,-5,7][i];});
+ cityQuest={active:true,subject,items:tasks,found:[],meshes:[],current:null,asked:[],guide:null,guideReady:false};
+ tasks.forEach((t,i)=>{
+  const g=new THREE.Group();
+  const geo=new THREE.BoxGeometry(1.05,1.05,1.05);
+  const colors=[0x38bdf8,0xfacc15,0xfb7185];
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:colors[i],emissive:colors[i],emissiveIntensity:.18,roughness:.35,metalness:.15}));
+  mesh.position.y=1.25;g.add(mesh);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.82,.055,8,28),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.25}));
+  ring.rotation.x=Math.PI/2;ring.position.y=.42;g.add(ring);
+  g.position.set(t.x,0,t.z);scene.add(g);cityQuest.meshes.push(g);
+ });
+ openCityQuestPanel();
+ showToast('Misi '+subject+' dimulai! Cari tiga benda bercahaya.');
+}
+function openCityQuestPanel(){
+ if(!cityQuest)return;
+ const found=cityQuest.found.length;
+ openModal(`<div class="flex justify-between items-center"><button id="cityQuestBack" class="text-cyan-200 text-sm">← Menu mini-game</button><span class="text-xs text-amber-200">MISI ${cityQuest.subject||"Matematika"}</span></div>
+ <div class="text-center my-3"><div class="text-5xl">🧭</div><h2 class="brand text-2xl font-bold">PENJELAJAH KOTA</h2><p class="text-sm text-blue-100">Berjalan mendekati benda 3D bercahaya dan jawab tantangan ${cityQuest.subject||"Matematika"} untuk mengumpulkannya.</p></div>
+ <div class="rounded-xl bg-slate-900/40 p-3"><div class="flex justify-between text-sm"><b>Progres penjelajahan</b><b>${found}/3</b></div><div class="h-2 rounded-full bg-white/10 mt-2 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${found/3*100}%"></div></div>
+ <div class="mt-3 space-y-2">${cityQuest.items.map((t,i)=>`<div class="flex items-center gap-2 text-sm"><span>${cityQuest.found.includes(i)?'✅':'🔒'}</span><span>${t.label}</span><span class="ml-auto text-xs text-blue-200">${cityQuest.found.includes(i)?'Ditemukan':'Cari di sekitar'}</span></div>`).join('')}</div></div>
+ <p class="text-xs text-blue-200 mt-3">Petunjuk: gunakan joystick atau tombol arah untuk menjelajahi lingkungan.</p>
+ <button id="cityQuestResume" class="w-full bg-emerald-500 rounded-xl p-3 mt-3 font-bold">Lanjut menjelajah</button>`);
+ setTimeout(()=>{
+  document.getElementById('cityQuestBack').onclick=openMiniGameHub;
+  document.getElementById('cityQuestResume').onclick=closeModal;
+ },0);
+}
+function updateCityExplorerQuest(dt){
+ if(!cityQuest?.active){
+  (window.citySubjectNPCs||[]).forEach(npc=>{
+   if(!npc.talked&&Math.hypot(player.position.x-npc.group.position.x,player.position.z-npc.group.position.z)<2.1){npc.talked=true;openGuideMission(npc.subject,npc.name);}
+   npc.group.rotation.y=Math.sin(clock.elapsedTime*.7)*.08;
+  });
+  return;
+ }
+ cityQuest.meshes.forEach((g,i)=>{
+  if(cityQuest.found.includes(i))return;
+  g.rotation.y+=dt*.8;g.position.y=.12+Math.sin(clock.elapsedTime*2.5+i)*.16;
+  const t=cityQuest.items[i];
+  const distance=Math.hypot(player.position.x-t.x,player.position.z-t.z);
+  if(distance>2.8&&cityQuest.asked[i])cityQuest.asked[i]=false;
+  if(distance<1.8&&!cityQuest.asked[i]){
+   cityQuest.asked[i]=true;cityQuest.current=i;openCityQuestQuestion(i);
+  }
+ });
+}
+function openCityQuestQuestion(i){
+ const t=cityQuest.items[i];
+ openModal(`<div class="text-center"><div class="text-5xl">${t.emoji}</div><h2 class="brand text-xl font-bold mt-2">${t.label} ditemukan!</h2><p class="text-sm text-blue-100 my-3">${t.q}</p></div><div class="grid gap-2">${t.opts.map(v=>`<button class="cityQuestAnswer rounded-xl bg-white/10 p-3 text-left font-bold" data-v="${v}">${v}</button>`).join('')}</div><p id="cityQuestFeedback" class="hidden p-3 rounded-xl mt-3 text-sm"></p>`);
+ setTimeout(()=>document.querySelectorAll('.cityQuestAnswer').forEach(b=>b.onclick=()=>{
+  if(b.disabled)return;document.querySelectorAll('.cityQuestAnswer').forEach(x=>x.disabled=true);
+  const ok=b.dataset.v===t.ans;const f=document.getElementById('cityQuestFeedback');f.classList.remove('hidden');f.className='p-3 rounded-xl mt-3 text-sm '+(ok?'bg-emerald-500/20':'bg-amber-500/20');f.textContent=(ok?'Tepat! ':'Belum tepat. ')+t.why;
+  if(ok){cityQuest.found.push(i);scene.remove(cityQuest.meshes[i]);awardUniqueXP('city-quest-'+String(cityQuest.subject||'Matematika')+'-object-'+i,20);playGameSfx('reward');}
+  const btn=document.createElement('button');btn.className='w-full bg-sky-500 rounded-xl p-3 mt-3 font-bold';btn.textContent=cityQuest.found.length===3?'Selesaikan misi':'Kembali menjelajah';f.after(btn);
+  btn.onclick=()=>{if(cityQuest.found.length===3){cityQuest.active=false;
+ const completedSubject=cityQuest.subject||'Matematika';
+ const daily=dailyMissionState();const dailyId=completedSubject==='Matematika'?'math':completedSubject==='IPAS'?'ipas':'bindo';
+ if(!daily.completed.includes(dailyId))daily.completed.push(dailyId);
+ saveDailyMissionState(daily);
+ let dailyBonus=0;if(daily.completed.length===3&&!daily.bonusClaimed){daily.bonusClaimed=true;dailyBonus=50;saveDailyMissionState(daily);addXP(50);}
+ if(window.citySubjectNPCs){window.citySubjectNPCs.forEach(n=>scene.remove(n.group));window.citySubjectNPCs=[];window.cityQuestGuide=null;}
+ addXP(30);openModal(`<div class="text-center"><div class="text-6xl">🏆</div><h2 class="brand text-2xl font-bold my-2">MISI KOTA TUNTAS!</h2><p class="text-blue-100">Kamu berhasil menemukan semua benda dan menyelesaikan tantangan ${completedSubject}.</p><p class="text-amber-200 font-bold my-3">Bonus penyelesaian: 30 XP ${dailyBonus?"+ bonus misi harian 50 XP":""}</p><button id="cityQuestDone" class="w-full bg-emerald-500 rounded-xl p-3">Kembali ke mini-game</button></div>`);document.getElementById('cityQuestDone').onclick=()=>{cityQuest=null;openMiniGameHub();};}else openCityQuestPanel();};
+ }),0);
+}
+
 function interact(){
  if(!nearTarget){showToast('Dekati NPC atau bangunan untuk berinteraksi.');return;}playGameSfx('interact');
  if(nearTarget.type==='exit'){leaveInterior();return;}
@@ -4047,10 +4524,10 @@ function interact(){
    const q=document.getElementById('walkerQuiz');
    if(q)q.onclick=()=>{
     closeModal();
-    const subjects=[...new Set(questionBank.map(item=>item.subject))];
-    const subject=subjects.length?subjects[(Math.floor(Math.random()*subjects.length))]:'Matematika';
-    const grade=questionBank.some(item=>item.subject===subject&&item.grade==='SMP')?'SMP':'SD';
-    startQuiz(subject,grade);
+    const grade=selectedGrade;
+     const subjects=[...new Set(questionBank.filter(item=>item.grade===grade).map(item=>item.subject))];
+     if(!subjects.length){showToast('Belum ada tantangan untuk jenjang '+grade+'.');return;}
+     openChallengeHub(subjects[Math.floor(Math.random()*subjects.length)]);
    };
    const b=document.getElementById('walkerBye');if(b)b.onclick=closeModal;
   },0);
@@ -4076,20 +4553,103 @@ function interact(){
  if(nearTarget.type==='npc'){
   guideVisited=true;const guideMissionEl=document.getElementById('guideMission');if(guideMissionEl)guideMissionEl.textContent='Selesai ✓';questProgress('guide');
   openModal(`<div class="flex items-center gap-3 mb-3"><div class="w-14 h-14 rounded-2xl bg-emerald-400 grid place-items-center text-2xl"><i class="fa-solid fa-person-chalkboard"></i></div><div><div class="brand text-2xl font-bold">Pak Dedi</div><div class="text-xs text-emerald-200">Pemandu Al Fajar City</div></div></div><p class="text-blue-50 mb-4">Halo, petualang! Selamat datang di Al Fajar City. Kamu bisa menjelajahi kota, masuk ke gedung sekolah, dan mengumpulkan buku ilmu. Coba kunjungi Sekolah Al Fajar di sebelah utara plaza!</p><button id="guideReward" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl px-4 py-3 w-full">Ambil hadiah +20 XP</button>`);
-  setTimeout(()=>{const b=document.getElementById('guideReward');if(b)b.onclick=()=>{addXP(20);closeModal();showToast('Terima kasih sudah menyapa Pak Dedi!');};},0);
+  setTimeout(()=>{const b=document.getElementById('guideReward');if(b)b.onclick=()=>{awardUniqueXP('npc-guide-pak-dedi',20);closeModal();showToast('Terima kasih sudah menyapa Pak Dedi!');};},0);
  }else{
   if(nearTarget.name==='Sekolah Al Fajar'){schoolVisited=true;const schoolMissionEl=document.getElementById('schoolMission');if(schoolMissionEl)schoolMissionEl.textContent='Selesai ✓';questProgress('school');}
-  openModal(`<div class="brand text-2xl font-bold mb-1">${nearTarget.name}</div><p class="text-blue-100 text-sm mb-4">Selamat datang! Pilih aktivitas yang ingin kamu lakukan.</p><div class="grid grid-cols-2 gap-3"><button class="activity bg-indigo-500" data-a="masuk"><i class="fa-solid fa-door-open text-2xl mb-2"></i><b class="block">Masuk Gedung</b><small class="text-white/80">Jelajahi interior 3D</small></button><button class="activity bg-sky-500 hover:bg-sky-400 rounded-xl p-4 text-left" data-a="materi"><i class="fa-solid fa-book-open text-2xl mb-2"></i><b class="block">Pelajari Materi</b><small class="text-white/80">Baca materi</small></button><button class="activity bg-emerald-500 hover:bg-emerald-400 rounded-xl p-4 text-left" data-a="kuis"><i class="fa-solid fa-circle-question text-2xl mb-2"></i><b class="block">Mulai Kuis</b><small class="text-white/80">Uji pemahaman</small></button><button class="activity bg-violet-500 hover:bg-violet-400 rounded-xl p-4 text-left" data-a="tantangan"><i class="fa-solid fa-trophy text-2xl mb-2"></i><b class="block">Tantangan</b><small class="text-white/80">Segera hadir</small></button><button class="activity bg-amber-500 hover:bg-amber-400 rounded-xl p-4 text-left" data-a="pencapaian"><i class="fa-solid fa-medal text-2xl mb-2"></i><b class="block">Pencapaian</b><small class="text-white/80">Lihat progres</small></button></div>`);
+  openModal(`<div class="brand text-2xl font-bold mb-1">${nearTarget.name}</div><p class="text-blue-100 text-sm mb-4">Selamat datang! Pilih aktivitas yang ingin kamu lakukan.</p><div class="grid grid-cols-2 gap-3"><button class="activity bg-indigo-500" data-a="masuk"><i class="fa-solid fa-door-open text-2xl mb-2"></i><b class="block">Masuk Gedung</b><small class="text-white/80">Jelajahi interior 3D</small></button><button class="activity bg-sky-500 hover:bg-sky-400 rounded-xl p-4 text-left" data-a="materi"><i class="fa-solid fa-book-open text-2xl mb-2"></i><b class="block">Pelajari Materi</b><small class="text-white/80">Baca materi</small></button><button class="activity bg-emerald-500 hover:bg-emerald-400 rounded-xl p-4 text-left" data-a="kuis"><i class="fa-solid fa-circle-question text-2xl mb-2"></i><b class="block">Mulai Kuis</b><small class="text-white/80">Uji pemahaman</small></button><button class="activity bg-violet-500 hover:bg-violet-400 rounded-xl p-4 text-left" data-a="tantangan"><i class="fa-solid fa-trophy text-2xl mb-2"></i><b class="block">Tantangan</b><small class="text-white/80">Segera hadir</small></button><button class="activity bg-fuchsia-500 hover:bg-fuchsia-400 rounded-xl p-4 text-left" data-a="minigame"><i class="fa-solid fa-gamepad text-2xl mb-2"></i><b class="block">Mini-Game</b><small class="text-white/80">Belajar sambil bermain</small></button><button class="activity bg-amber-500 hover:bg-amber-400 rounded-xl p-4 text-left" data-a="pencapaian"><i class="fa-solid fa-medal text-2xl mb-2"></i><b class="block">Pencapaian</b><small class="text-white/80">Lihat progres</small></button></div>`);
   setTimeout(()=>document.querySelectorAll('.activity').forEach(b=>b.onclick=()=>{
    const a=b.dataset.a;
    if(a==='masuk'){const chosen=nearTarget;closeModal();enterInterior(chosen);return;}
-   if(a==='materi')openModal(`<div class="brand text-2xl font-bold mb-2">Ruang Materi</div><p class="text-blue-100 text-sm">Selamat datang di ruang belajar ${nearTarget.name}. Materi interaktif dan pustaka guru akan ditambahkan pada Tahap 4.</p><div class="mt-4 rounded-xl bg-white/10 p-4"><i class="fa-solid fa-lightbulb text-amber-300 mr-2"></i>Belajar sedikit demi sedikit setiap hari membuatmu semakin hebat!</div>`);
+   if(a==='materi')openMaterialHub(nearTarget.name);
    else if(a==='kuis')openModal(`<div class="brand text-2xl font-bold mb-2">Kuis Pengetahuan Umum</div><p class="text-blue-100 mb-4">Planet yang dikenal sebagai Planet Merah adalah...</p><div class="space-y-2">${['Venus','Mars','Jupiter','Saturnus'].map((v,i)=>`<button class="answer w-full text-left bg-white/10 hover:bg-white/20 p-3 rounded-xl" data-v="${v}">${String.fromCharCode(65+i)}. ${v}</button>`).join('')}</div>`);
-   else if(a==='tantangan')openModal(`<div class="brand text-2xl font-bold mb-2">Tantangan</div><p class="text-blue-100">Mode tantangan khusus akan dibangun pada Tahap 3.</p>`);
+   else if(a==='tantangan')openChallengeHub();
+   else if(a==='minigame')openMiniGameHub();
    else openModal(`<div class="brand text-2xl font-bold mb-2">Pencapaian</div><p class="text-blue-100">XP: ${xp} · Koin: ${coins} · Buku: ${bookCount}</p>`);
    if(a==='kuis')setTimeout(()=>document.querySelectorAll('.answer').forEach(btn=>btn.onclick=()=>{if(btn.dataset.v==='Mars'){addXP(15);showToast('Benar! Mars adalah Planet Merah.');}else showToast('Belum tepat. Mars dikenal sebagai Planet Merah.');closeModal();}),0);
   }),0);
  }
+}
+
+/* v15.5 — Mini-game 3D edukasi berbasis lingkungan kota */
+function openMiniGameHub(){
+ openModal(`<div class="brand text-2xl font-bold mb-2">🎮 MINI-GAME 3D</div>
+ <p class="text-sm text-blue-100 mb-4">Masuki tantangan singkat dengan tampilan dunia AL FAJAR.</p>
+ <div class="grid sm:grid-cols-2 gap-3">
+ <button id="mgFactory" class="rounded-2xl border border-sky-300/30 bg-gradient-to-br from-sky-500/30 to-indigo-700/30 p-4 text-left"><div class="text-4xl mb-2">🏭</div><b class="block text-lg">Number Factory 3D</b><small class="text-blue-100">Bangun bilangan dari ratusan, puluhan, dan satuan.</small></button>
+ <button id="mgMarket" class="rounded-2xl border border-emerald-300/30 bg-gradient-to-br from-emerald-500/30 to-teal-700/30 p-4 text-left"><div class="text-4xl mb-2">🛒</div><b class="block text-lg">Math Market 3D</b><small class="text-blue-100">Belanja barang dan hitung jumlah koin.</small></button><button id="mgDaily" class="rounded-2xl border border-fuchsia-300/30 bg-gradient-to-br from-fuchsia-500/30 to-pink-700/30 p-4 text-left sm:col-span-2"><div class="text-3xl mb-1">📅</div><b class="block">Papan Misi Harian</b><small class="text-blue-100">Lihat target belajar, progres, dan hadiah hari ini.</small></button><button id="mgCityQuest" class="rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-500/30 to-orange-700/30 p-4 text-left sm:col-span-2"><div class="text-4xl mb-2">🧭</div><b class="block text-lg">Misi Penjelajah Kota</b><small class="text-blue-100">Jelajahi area sekitar, temukan benda 3D, lalu jawab tantangan singkat.</small></button>
+ </div>`);
+ setTimeout(()=>{
+  document.getElementById('mgFactory')?.addEventListener('click',openNumberFactory3D);
+  document.getElementById('mgMarket')?.addEventListener('click',openMathMarket3D);
+  document.getElementById('mgCityQuest')?.addEventListener('click',createCityQuestGuide);
+  document.getElementById('mgDaily')?.addEventListener('click',openDailyMissionBoard);
+ },0);
+}
+function openNumberFactory3D(){
+ const qs=[
+  {n:326,q:'Pilih nilai angka 2.',o:['2','20','200'],a:'300',ex:'Angka 3 bernilai 300, angka 2 bernilai 20, dan angka 6 bernilai 6.'},
+  {n:451,q:'Angka 5 menempati tempat ....',o:['Ratusan','Puluhan','Satuan'],a:'Puluhan',ex:'Pada 451, angka 5 berada di tempat puluhan.'},
+  {n:708,q:'Bentuk panjang dari 708 adalah ....',o:['700 + 8','70 + 8','700 + 80'],a:'700 + 8',ex:'708 terdiri dari 7 ratusan, 0 puluhan, dan 8 satuan.'},
+  {n:639,q:'Nilai angka 9 adalah ....',o:['9','90','900'],a:'9',ex:'Angka 9 berada di tempat satuan.'}
+ ];
+ let i=0,points=0,answered=false;
+ function show(){
+  answered=false;const q=qs[i];
+  openModal(`<div class="flex justify-between text-xs text-blue-100 mb-2"><button id="mgBack">← Kembali</button><b>MESIN BILANGAN · ${i+1}/${qs.length}</b></div>
+  <div class="text-center rounded-2xl p-5 mb-4 border border-cyan-200/30 bg-gradient-to-br from-blue-700/60 to-violet-700/60 shadow-xl">
+   <div class="text-xs tracking-widest text-cyan-100">NUMBER FACTORY 3D</div><div class="flex justify-center items-end gap-2 my-4">
+   ${String(q.n).split('').map((d,k)=>`<div class="rounded-xl p-3 min-w-14 shadow-lg border border-white/30 ${['bg-rose-500','bg-amber-500','bg-emerald-500'][k]}"><div class="text-4xl font-black">${d}</div><small>${['Ratusan','Puluhan','Satuan'][k]}</small></div>`).join('')}
+   </div><p class="text-sm text-blue-100">Amati balok angka dari mesin!</p>
+  </div><p class="font-bold mb-3">${q.q}</p><div class="grid gap-2">${q.o.map(v=>`<button class="mgChoice rounded-xl bg-white/10 p-3 text-left font-bold" data-value="${v}">${v}</button>`).join('')}</div>
+  <div id="mgExplain" class="hidden rounded-xl p-3 mt-3 text-sm"></div><div class="flex justify-between items-center mt-4"><span class="text-xs text-amber-200">Skor: ${points}</span><button id="mgContinue" class="hidden bg-emerald-500 rounded-xl px-5 py-3 font-bold">Lanjut</button></div>`);
+  setTimeout(()=>{
+   document.getElementById('mgBack').onclick=openMiniGameHub;
+   document.querySelectorAll('.mgChoice').forEach(btn=>btn.onclick=()=>{
+    if(answered)return;answered=true;const correct=btn.dataset.value===q.a; if(correct)points++;
+    const box=document.getElementById('mgExplain');box.classList.remove('hidden');box.className='rounded-xl p-3 mt-3 text-sm '+(correct?'bg-emerald-500/20':'bg-amber-500/20');box.textContent=(correct?'Benar! ':'Belum tepat. ')+q.ex;
+    document.querySelectorAll('.mgChoice').forEach(x=>x.disabled=true);
+    const next=document.getElementById('mgContinue');next.classList.remove('hidden');next.onclick=()=>{
+     i++;if(i<qs.length){show();return;}
+     addXP(points*10+10);
+     openModal(`<div class="text-center"><div class="text-5xl">🏆</div><h2 class="brand text-2xl font-bold my-2">MESIN SELESAI!</h2><p class="text-blue-100">Jawaban benar: ${points} dari ${qs.length}</p><p class="text-amber-200 font-bold my-3">Hadiah ${points*10+10} XP</p><button id="mgAgain" class="bg-sky-500 rounded-xl p-3 w-full">Main lagi</button><button id="mgHome" class="bg-white/10 rounded-xl p-3 w-full mt-2">Menu mini-game</button></div>`);
+     document.getElementById('mgAgain').onclick=openNumberFactory3D;document.getElementById('mgHome').onclick=openMiniGameHub;
+    };
+   });
+  },0);
+ }
+ show();
+}
+function openMathMarket3D(){
+ const rounds=[
+  {task:'Beli 1 buku (5 koin) dan 2 pensil (2 koin tiap pensil). Berapa totalnya?',need:{Buku:1,Pensil:2},total:9},
+  {task:'Beli 2 penghapus (3 koin tiap penghapus). Berapa totalnya?',need:{Penghapus:2},total:6},
+  {task:'Uangmu 20 koin. Beli 1 buku (5) dan 1 penggaris (4). Berapa kembaliannya?',need:{Buku:1,Penggaris:1},total:11,change:true}
+ ];
+ const goods=[['Buku','📘',5],['Pensil','✏️',2],['Penghapus','🧽',3],['Penggaris','📏',4]];
+ let round=0,cart={},score=0,done=false;
+ function show(){
+  cart={};done=false;const r=rounds[round];
+  openModal(`<div class="flex justify-between text-xs text-blue-100 mb-2"><button id="marketBack">← Kembali</button><b>PASAR CERDAS · ${round+1}/${rounds.length}</b></div>
+  <div class="rounded-2xl p-4 mb-3 text-center bg-gradient-to-br from-emerald-700/60 to-teal-600/40 border border-emerald-200/30"><div class="text-4xl">🏪</div><div class="brand font-bold text-xl">MATH MARKET 3D</div><p class="text-sm mt-2">${r.task}</p></div>
+  <div class="grid grid-cols-2 gap-2">${goods.map(g=>`<button class="marketPick bg-white/10 rounded-xl p-3 text-left" data-name="${g[0]}"><span class="text-2xl">${g[1]}</span><b class="block">${g[0]}</b><small>${g[2]} koin · <span id="qty-${g[0]}">0</span> dipilih</small></button>`).join('')}</div>
+  <div class="rounded-xl bg-slate-900/50 p-3 mt-3"><div class="text-xs text-blue-200">KERANJANG</div><div id="marketSummary" class="font-bold mt-1">Kosong</div><button id="marketVerify" class="w-full bg-emerald-500 rounded-xl p-3 mt-3 font-bold">Periksa keranjang</button><p id="marketResult" class="hidden text-sm mt-3 p-3 rounded-xl"></p><button id="marketNext" class="hidden w-full bg-sky-500 rounded-xl p-3 mt-3 font-bold">Lanjut</button></div>`);
+  setTimeout(()=>{
+   document.getElementById('marketBack').onclick=openMiniGameHub;
+   document.querySelectorAll('.marketPick').forEach(b=>b.onclick=()=>{if(done)return;const name=b.dataset.name;cart[name]=(cart[name]||0)+1;document.getElementById('qty-'+name).textContent=cart[name];document.getElementById('marketSummary').textContent=Object.entries(cart).map(([k,v])=>`${k} × ${v}`).join(' · ');});
+   document.getElementById('marketVerify').onclick=()=>{
+    if(done)return;const expected=r.need;const keys=new Set([...Object.keys(cart),...Object.keys(expected)]);const ok=[...keys].every(k=>(cart[k]||0)===(expected[k]||0));
+    const result=document.getElementById('marketResult');result.classList.remove('hidden');
+    if(!ok){result.className='text-sm mt-3 p-3 rounded-xl bg-amber-500/20';result.textContent='Belum sesuai. Periksa jenis dan jumlah barang, lalu coba lagi.';return;}
+    done=true;score++;result.className='text-sm mt-3 p-3 rounded-xl bg-emerald-500/20';result.textContent=r.change?`Hebat! Total belanja 9 koin. Kembalian dari 20 koin adalah ${r.total} koin.`:`Benar! Total belanjamu ${r.total} koin.`;
+    document.getElementById('marketVerify').disabled=true;const next=document.getElementById('marketNext');next.classList.remove('hidden');next.onclick=()=>{
+     round++;if(round<rounds.length){show();return;}addXP(score*15);
+     openModal(`<div class="text-center"><div class="text-5xl">🛍️</div><h2 class="brand text-2xl font-bold my-2">PASAR SELESAI!</h2><p class="text-blue-100">Tugas selesai: ${score}/${rounds.length}</p><p class="text-amber-200 font-bold my-3">Hadiah ${score*15} XP</p><button id="marketAgain" class="bg-sky-500 rounded-xl p-3 w-full">Main lagi</button><button id="marketHome" class="bg-white/10 rounded-xl p-3 w-full mt-2">Menu mini-game</button></div>`);
+     document.getElementById('marketAgain').onclick=openMathMarket3D;document.getElementById('marketHome').onclick=openMiniGameHub;
+    };
+   };
+  },0);
+ }
+ show();
 }
 document.getElementById('interactBtn').onclick=interact;
 document.getElementById('interactMobile').onclick=interact;
@@ -4276,11 +4836,16 @@ function updateCollectibles(dt){
   b.group.position.y=b.baseY+Math.sin(clock.elapsedTime*2.5+b.group.position.x)*.14;
   b.group.rotation.y+=dt*.8;
   if(Math.hypot(player.position.x-b.group.position.x,player.position.z-b.group.position.z)<1.6){
-   b.got=true;scene.remove(b.group);bookCount++;document.getElementById('bookText').textContent=bookCount;questProgress('books');updateDaily('books');addXP(10);showToast('Buku ilmu ditemukan! +10 XP');
+   b.got=true;scene.remove(b.group);bookCount++;document.getElementById('bookText').textContent=bookCount;questProgress('books');updateDaily('books');awardUniqueXP('collectible-book-'+bookIndex,10);showToast('Buku ilmu ditemukan!');
   }
  }
 }
 let afDiagFrames=0,afDiagLast=0;
+
+ // Auto-save berkala dan saat tab ditutup/berpindah aplikasi.
+ setInterval(savePlayerCheckpoint,10000);
+ window.addEventListener('pagehide',savePlayerCheckpoint);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')savePlayerCheckpoint();});
 function animate(){
  requestAnimationFrame(animate);afDiagFrames++;
  try {
@@ -4294,7 +4859,7 @@ const dt=Math.min(clock.getDelta(),.04);
   camera.position.lerp(introPos,1-Math.exp(-dt*1.8));
   camera.lookAt(0,1.5, mobileView?7:5);
  }else updateCamera(dt);
- updateCollectibles(dt);updateCityStudents(dt);
+ updateCollectibles(dt);updateCityStudents(dt);updateCityExplorerQuest(dt);
  updateAmbientParticles(dt);updateWeather(dt);
  cityBanners.forEach(b=>{b.cloth.rotation.z=Math.sin(clock.elapsedTime*1.35+b.phase)*.045;});
 
@@ -4614,7 +5179,55 @@ document.getElementById('tournamentBtn').onclick=openTournament;
 // WORLD SELECTOR v3.0 — remember the learner's school level locally.
 
 // LANDING PAGE v2.8 — reveal the game HUD only after the player starts.
-function enterAlFajar(mode='play'){
+function returnToWelcomeHome(){
+ savePlayerCheckpoint();
+ openModal(`<div class="max-w-sm mx-auto text-center p-2">
+  <div class="text-5xl mb-3">🏠</div>
+  <h2 class="text-2xl font-black text-slate-900">Kembali ke Halaman Utama?</h2>
+  <p class="text-sm text-slate-600 mt-2 mb-5">Apakah kamu yakin ingin keluar dari permainan dan kembali ke halaman utama?</p>
+  <div class="grid grid-cols-2 gap-3">
+   <button id="cancelReturnHome" class="rounded-xl px-4 py-3 font-bold bg-slate-200 text-slate-800">Tidak, Lanjut Main</button>
+   <button id="confirmReturnHome" class="rounded-xl px-4 py-3 font-bold text-white" style="background:linear-gradient(135deg,#16b86a,#087b4a)">Ya, Keluar</button>
+  </div>
+ </div>`);
+ setTimeout(()=>{
+  const cancel=document.getElementById('cancelReturnHome');
+  const confirm=document.getElementById('confirmReturnHome');
+  if(cancel)cancel.onclick=()=>closeModal();
+  if(confirm)confirm.onclick=()=>{closeModal();performReturnToWelcomeHome();};
+ },0);
+}
+function performReturnToWelcomeHome(){
+ // Tutup panel yang mungkin masih terbuka, lalu tampilkan kembali landing page.
+ try{closeModal();}catch(e){}
+ const menu=document.getElementById('featureMenu');
+ if(menu)menu.classList.add('hidden');
+ const welcome=document.getElementById('welcomeScreen');
+ const gameMount=document.getElementById('game');
+ if(gameMount){gameMount.style.display='none';gameMount.style.visibility='hidden';}
+ if(renderer&&renderer.domElement){
+  renderer.domElement.style.display='none';
+  renderer.domElement.style.visibility='hidden';
+ }
+ ['topHud','locationTag','miniMapWrap','desktopHint','mobileControls','interaction','missionPanel','questMobileBtn'].forEach(id=>{
+  const el=document.getElementById(id);if(el)el.style.display='none';
+ });
+ if(welcome){
+  welcome.style.display='block';
+  welcome.classList.remove('leaving');
+  welcome.style.opacity='1';
+  welcome.style.visibility='visible';
+  welcome.style.pointerEvents='auto';
+  welcome.scrollTop=0;
+ }
+ showToast('Kamu kembali ke halaman utama.');
+}
+function enterAlFajar(mode='play',characterReady=false){
+ // Setiap sesi Main dimulai dari studio karakter; flag lama di perangkat tidak boleh melewati langkah ini.
+ if(mode==='play' && !characterReady){
+  openCharacterCreator();
+  return;
+ }
  window.__afDiag('Tombol Main ditekan; masuk ke dunia 3D.');
  const welcome=document.getElementById('welcomeScreen');
  const gameMount=document.getElementById('game');
@@ -4623,10 +5236,81 @@ function enterAlFajar(mode='play'){
  if(welcome){welcome.classList.add('leaving');if(soundOn){initAudio();startGameMusic();}setTimeout(()=>{welcome.style.display='none';try{camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.render(scene,camera);}catch(e){console.warn('AL FAJAR start render:',e);}},760);}
  ['topHud','locationTag','miniMapWrap','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
  const hint=document.getElementById('desktopHint');if(hint)hint.style.display='';
- const loc=document.getElementById('locationTag');if(loc)loc.innerHTML=`<i class="fa-solid fa-location-dot text-amber-300 mr-1"></i> AL FAJAR CITY · ${selectedGrade}`;
- showToast(mode==='teacher'?'Selamat datang di ruang guru!':`Selamat datang di Al Fajar City · ${selectedGrade}!`);
+ const loc=document.getElementById('locationTag');if(loc)loc.innerHTML=`<i class="fa-solid fa-location-dot text-amber-300 mr-1"></i> AL FAJAR CITY · ${selectedGrade} KELAS ${selectedClass}`;
+ const playerName=localStorage.getItem('alfajar_character_name')||'Petualang';
+ showToast(mode==='teacher'?'Selamat datang di ruang guru!':`Selamat datang, ${playerName}! · ${selectedGrade} Kelas ${selectedClass}`);
  if(mode==='student')setTimeout(()=>document.getElementById('studentBtn')?.click(),500);
  if(mode==='teacher')setTimeout(()=>teacherDashboard('questions'),500);
+}
+
+
+// ONBOARDING KARAKTER — langkah pertama sebelum pemain memasuki Al Fajar City.
+function openCharacterCreator(){
+ const colorOptions=(values)=>values.map(([v,label])=>`<option value="${v}">${label}</option>`).join('');
+ openModal(`<div class="max-w-xl mx-auto">
+  <div class="text-center mb-4">
+   <div class="text-5xl mb-2">🧑‍🚀</div>
+   <div class="text-2xl sm:text-3xl font-black text-slate-900">Buat Karaktermu!</div>
+   <p class="text-sm text-slate-600 mt-1">Sebelum menjelajahi Al Fajar City, buat avatar yang akan menemanimu belajar dan menyelesaikan misi.</p>
+  </div>
+  <div class="rounded-2xl p-4 mb-4 text-center" style="background:linear-gradient(135deg,#dbeafe,#fef3c7)">
+   <div class="text-6xl mb-1" id="creatorEmoji">🧑🏻‍🎓</div>
+   <div class="font-black text-slate-800" id="creatorPreviewName">Petualang Baru</div>
+   <div class="text-xs text-slate-600">Pratinjau karakter</div>
+  </div>
+  <div class="grid grid-cols-2 gap-3 text-sm">
+   <label class="col-span-2 font-bold text-slate-700">Nama karakter
+    <input id="creatorName" maxlength="18" placeholder="Contoh: Afi" class="mt-1 w-full rounded-xl border border-slate-300 p-3 text-slate-900">
+   </label>
+   <label class="bg-slate-100 rounded-xl p-3 text-slate-800">Karakter
+    <select id="avGender" class="mt-2 w-full bg-white rounded-lg p-2"><option>Laki-laki</option><option>Perempuan</option></select>
+   </label>
+   <label class="bg-slate-100 rounded-xl p-3 text-slate-800">Warna kulit
+    <select id="avSkin" class="mt-2 w-full bg-white rounded-lg p-2">${colorOptions([['d99b72','Sawo matang'],['f1c7a5','Cerah'],['a96e4f','Cokelat'],['754a37','Gelap']])}</select>
+   </label>
+   <label class="bg-slate-100 rounded-xl p-3 text-slate-800">Rambut
+    <select id="avHair" class="mt-2 w-full bg-white rounded-lg p-2">${colorOptions([['3c2d28','Hitam'],['70452d','Cokelat'],['d4a64d','Pirang'],['273d59','Biru gelap']])}</select>
+   </label>
+   <label class="bg-slate-100 rounded-xl p-3 text-slate-800">Pakaian
+    <select id="avOutfit" class="mt-2 w-full bg-white rounded-lg p-2">${colorOptions([['347fca','Seragam biru'],['26966e','Seragam hijau'],['e8e8e8','Seragam putih'],['b65e58','Batik merah'],['704b9a','Seragam pramuka']])}</select>
+   </label>
+   <label class="col-span-2 bg-slate-100 rounded-xl p-3 text-slate-800">Aksesori
+    <select id="avWear" class="mt-2 w-full bg-white rounded-lg p-2"><option value="Tas">Tas sekolah</option><option value="Topi">Topi</option><option value="Kacamata">Kacamata</option><option value="Tanpa">Tanpa aksesori</option></select>
+   </label>
+  </div>
+  <p class="text-xs text-slate-500 mt-3">Karakter dan namamu akan disimpan di perangkat ini. Kamu tetap bisa mengubah penampilan melalui menu Avatar.</p>
+  <button id="creatorStart" class="mt-4 w-full rounded-xl p-4 text-white font-black text-lg" style="background:linear-gradient(135deg,#16b86a,#087b4a);box-shadow:0 5px 0 #075b38">✓ Simpan Karakter & Mulai Bermain</button>
+ </div>`);
+ setTimeout(()=>{
+  const $=id=>document.getElementById(id);
+  $('creatorName').value=localStorage.getItem('alfajar_character_name')||'';
+  $('avGender').value=avatarState.gender;
+  $('avSkin').value=avatarState.skin.toString(16).padStart(6,'0');
+  $('avHair').value=avatarState.hair.toString(16).padStart(6,'0');
+  $('avOutfit').value=avatarState.outfit.toString(16).padStart(6,'0');
+  $('avWear').value=avatarState.wear;
+  const preview=()=>{
+   const name=$('creatorName').value.trim()||'Petualang Baru';
+   $('creatorPreviewName').textContent=name;
+   $('creatorEmoji').textContent=$('avGender').value==='Perempuan'?'👩🏻‍🎓':'🧑🏻‍🎓';
+  };
+  ['creatorName','avGender'].forEach(id=>$(id).addEventListener('input',preview));
+  $('creatorStart').onclick=()=>{
+   const name=$('creatorName').value.trim();
+   if(!name){showToast('Isi nama karaktermu terlebih dahulu.');$('creatorName').focus();return;}
+   avatarState.gender=$('avGender').value;
+   avatarState.skin=parseInt($('avSkin').value,16);
+   avatarState.hair=parseInt($('avHair').value,16);
+   avatarState.outfit=parseInt($('avOutfit').value,16);
+   avatarState.wear=$('avWear').value;
+   try{localStorage.setItem('alfajar_character_name',name);localStorage.setItem('alfajar_character_created','1');}catch(e){}
+   updatePlayerNameTag();
+   applyAvatarLook();
+   closeModal();
+   showToast('Karakter '+name+' siap berpetualang!');
+   enterAlFajar('play',true);
+  };
+ },0);
 }
 
 window.enterAlFajar=enterAlFajar;
@@ -4638,14 +5322,31 @@ function refreshWorldChoice(){
   btn.style.boxShadow=active?'0 0 0 2px #86efac55':'none';
  });
  const label=document.getElementById('selectedWorldLabel');
- if(label)label.textContent='Dunia terpilih: '+selectedGrade;
+ if(label)label.textContent='Dunia terpilih: '+selectedGrade+' · Kelas '+selectedClass;
+ const select=document.getElementById('selectedClassInput');
+ if(select){
+  const first=selectedGrade==='SD'?1:selectedGrade==='SMP'?7:10;
+  const last=selectedGrade==='SD'?6:selectedGrade==='SMP'?9:12;
+  select.innerHTML=Array.from({length:last-first+1},(_,i)=>`<option value="${first+i}">Kelas ${first+i}</option>`).join('');
+  select.value=String(selectedClass);
+ }
+ const note=document.getElementById('classAvailabilityNote');
+ if(note)note.textContent=selectedGrade==='SD'&&selectedClass===3?'Bank soal Matematika, IPAS, dan Bahasa Indonesia Kelas 3 tersedia.':`Pilihan kelas ${selectedClass} aktif. Soal khusus kelas ini akan muncul jika bank soal atau soal guru sudah diberi label kelas ${selectedClass}.`;
 }
 document.querySelectorAll('.gradeWorldBtn').forEach(btn=>btn.addEventListener('click',()=>{
  selectedGrade=btn.dataset.grade;
- try{localStorage.setItem('alfajar_selected_grade',selectedGrade);}catch(e){}
- refreshWorldChoice();
- showToast('Dunia '+selectedGrade+' dipilih!');
+ if(selectedGrade==='SD')selectedClass=3;
+ else if(selectedGrade==='SMP')selectedClass=7;
+ else selectedClass=10;
+ try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+ refreshWorldChoice();showToast('Dunia '+selectedGrade+' · Kelas '+selectedClass+' dipilih!');
 }));
+document.getElementById('selectedClassInput')?.addEventListener('change',e=>{
+ selectedClass=Number(e.target.value)||3;
+ try{localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(err){}
+ refreshWorldChoice();
+ showToast('Kelas '+selectedClass+' dipilih!');
+});
 refreshWorldChoice();
 
 document.getElementById('welcomeScreen').addEventListener('click',(event)=>{
@@ -4659,6 +5360,7 @@ document.getElementById('welcomePlay').onclick=()=>enterAlFajar('play');
 document.getElementById('welcomePlayTop').onclick=()=>enterAlFajar('play');
 document.getElementById('welcomeLogin').onclick=()=>enterAlFajar('student');
 document.getElementById('welcomeTeacher').onclick=()=>enterAlFajar('teacher');
+ document.getElementById('returnHomeBtn').onclick=returnToWelcomeHome;
 ['topHud','locationTag','miniMapWrap','desktopHint','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
 
 // Smart HUD: feature buttons remain wired to their existing handlers, but live in one categorized drawer.
