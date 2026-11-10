@@ -317,6 +317,7 @@ button,.hud-panel,.glass-panel{ -webkit-font-smoothing:antialiased}
  #modalContent #creatorStart{position:sticky;bottom:0;z-index:3}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -430,6 +431,11 @@ window.__afDiagReady=true;
 <div id="locationTag" class="fixed top-[92px] left-1/2 -translate-x-1/2 z-10 glass rounded-full px-4 py-2 text-white text-xs font-extrabold tracking-wide pointer-events-none">
   <i class="fa-solid fa-location-dot text-amber-300 mr-1"></i> AL FAJAR CITY
 </div>
+<button id="accountStatusBadge" type="button" onclick="openAccountStatusInfo()"
+ class="fixed top-[132px] left-1/2 -translate-x-1/2 z-[35] glass rounded-full px-3 py-1.5 text-white text-[10px] font-extrabold tracking-wide shadow-lg border border-white/20 pointer-events-auto"
+ aria-label="Informasi akun yang sedang digunakan">
+ <i class="fa-solid fa-user-clock text-amber-300 mr-1"></i><span id="accountStatusBadgeText">MODE TAMU</span>
+</button>
 <div id="miniMapWrap" style="left:16px!important;right:auto!important" class="fixed left-4 top-[94px] z-10 glass rounded-2xl p-2 pointer-events-none hidden sm:block">
   <div class="flex items-center justify-between text-[9px] text-white font-extrabold tracking-wider mb-1 px-1"><span><i class="fa-solid fa-map text-amber-300 mr-1"></i> PETA KOTA</span><span id="mapZone">PLAZA</span></div>
   <canvas id="miniMap" width="180" height="180" style="width:144px;height:144px;border-radius:10px;background:#193b4d"></canvas>
@@ -1164,7 +1170,7 @@ function makeBuilding(name,x,z,w,d,h,color,accent,kind='school'){
  const signTex=new THREE.CanvasTexture(signCanvas);signTex.colorSpace=THREE.SRGBColorSpace;
  const signMesh=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w*.78,6.2),1.05),new THREE.MeshBasicMaterial({map:signTex,transparent:false}));
  signMesh.position.set(0,Math.min(h*.56,5.2),d/2+.29);g.add(signMesh);
- buildings.push({name,group:g,x,z,r:Math.max(w,d)*.58+2,kind});
+ buildings.push({name,group:g,x,z,r:Math.max(w,d)*.58+2,kind,width:w,depth:d,entranceX:x,entranceZ:z+d/2+2.55});
  return g;
 }
 makeBuilding('Sekolah Al Fajar',-23,-24,17,13,8,0xf2c66d,0x3479b9,'school');
@@ -3132,7 +3138,7 @@ function syncAudioPanel(){const p=document.getElementById('audioSettings');if(!p
 
 
 try{const wallet=JSON.parse(localStorage.getItem('alfajar_wallet_v21')||'{}');xp=Number(wallet.xp)||0;coins=Number(wallet.coins)||0;playerLevel=Math.max(1,Number(wallet.level)||1);}catch(e){}
-function saveWallet(){try{localStorage.setItem('alfajar_wallet_v21',JSON.stringify({xp,coins,level:playerLevel}));}catch(e){}}
+function saveWallet(){try{localStorage.setItem('alfajar_wallet_v21',JSON.stringify({xp,coins,level:playerLevel}));}catch(e){}if(typeof queueAfCloudSave==='function')queueAfCloudSave();}
 function refreshWalletUI(){
  const x=document.getElementById('xpText'),b=document.getElementById('xpBar'),c=document.getElementById('coinText');
  if(x)x.textContent=`${xp} / 100 XP`;if(b)b.style.width=Math.min(100,xp)+'%';if(c)c.textContent=coins;
@@ -3150,7 +3156,10 @@ const questDefs=[
 let questState={};
 try{questState=JSON.parse(localStorage.getItem('alfajar_quests_v20')||'{}')||{};}catch(e){questState={};}
 questDefs.forEach(q=>{if(!questState[q.id])questState[q.id]={progress:0,claimed:false};});
-function saveQuestState(){try{localStorage.setItem('alfajar_quests_v20',JSON.stringify(questState));}catch(e){}}
+function saveQuestState(){
+ try{localStorage.setItem('alfajar_quests_v20',JSON.stringify(questState));}catch(e){}
+ if(typeof queueAfCloudSave==='function')queueAfCloudSave();
+}
 
 // Celebration overlay for meaningful game milestones.
 let milestoneTimer=0;
@@ -3226,7 +3235,12 @@ function awardUniqueXP(rewardId,amount){
  if(afRewardLedger[id]){showToast('Hadiah XP untuk aktivitas ini sudah pernah kamu dapatkan.');return false;}
  // Tandai sebelum memberi hadiah agar klik berulang tidak menggandakan XP.
  afRewardLedger[id]={claimedAt:new Date().toISOString(),amount:Number(amount)||0};
- saveRewardLedger();addXP(amount);return true;
+ saveRewardLedger();addXP(amount);
+ if(!afGuestMode&&afAuthUser&&!afCloudLoading){
+  getAfSupabase().from('player_rewards').insert({user_id:afAuthUser.id,reward_id:id,xp_amount:Number(amount)||0,coins_amount:Math.max(1,Math.floor((Number(amount)||0)/5))})
+   .then(({error})=>{if(error&&error.code!=='23505')console.warn('Reward cloud save:',error);});
+ }
+ return true;
 }
 function savePlayerCheckpoint(){
  try{
@@ -3237,7 +3251,7 @@ function savePlayerCheckpoint(){
    characterName:localStorage.getItem('alfajar_character_name')||'Petualang',
    grade:selectedGrade,classLevel:selectedClass};
   localStorage.setItem('alfajar_game_checkpoint_v1',JSON.stringify(checkpoint));
-  saveWallet();saveRewardLedger();
+  saveWallet();saveRewardLedger();if(typeof queueAfCloudSave==='function')queueAfCloudSave();
  }catch(e){}
 }
 function restorePlayerCheckpoint(){
@@ -3990,9 +4004,13 @@ function applyAvatarLook(){
  torso.scale.y=isFemale?1.02:1;
  cap.visible=avatarState.wear==='Topi';glasses.visible=avatarState.wear==='Kacamata';backpack.visible=avatarState.wear==='Tas';
  try{localStorage.setItem('alfajar_avatar_v21',JSON.stringify(avatarState));}catch(e){}
+ if(typeof queueAfCloudSave==='function')queueAfCloudSave();
  if(typeof updatePlayerNameTag==='function')updatePlayerNameTag();
 }
-function saveOwnedItems(){try{localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));}catch(e){}}
+function saveOwnedItems(){
+ try{localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));}catch(e){}
+ if(typeof queueAfCloudSave==='function')queueAfCloudSave();
+}
 
 const todayKey=()=>new Date().toLocaleDateString('en-CA');
 let dailyState={date:todayKey(),books:0,quiz:0,claimed:false};
@@ -4731,17 +4749,21 @@ function nearestInteraction(){
  }
  for(const st of cityStudents){
   const d=Math.hypot(player.position.x-st.root.position.x,player.position.z-st.root.position.z);
-  if(d<3.4&&d<dist){best={type:'student',name:st.name,student:st};dist=d;}
+  if(d<4.6&&d<dist){best={type:'student',name:st.name,student:st};dist=d;}
  }
  for(const walker of pedestrianNPCs){
   const d=Math.hypot(player.position.x-walker.root.position.x,player.position.z-walker.root.position.z);
-  if(d<3.5&&d<dist){best={type:'pedestrian',name:walker.root.userData.displayName||'Warga Kota',walker};dist=d;}
+  if(d<4.6&&d<dist){best={type:'pedestrian',name:walker.root.userData.displayName||'Warga Kota',walker};dist=d;}
  }
  const dNpc=Math.hypot(player.position.x-npc.position.x,player.position.z-npc.position.z);
- if(dNpc<4.2){best={type:'npc',name:'Pak Dedi'};dist=dNpc;}
+ if(dNpc<4.2&&dNpc<dist){best={type:'npc',name:'Pak Dedi'};dist=dNpc;}
  for(const b of buildings){
-  const d=Math.hypot(player.position.x-b.x,player.position.z-b.z);
-  if(d<Math.max(b.r,5)&&d<dist){best={type:'building',name:b.name};dist=d;}
+  // Pemicu gedung dihitung dari area pintu depan, bukan titik tengah bangunan.
+  // Titik tengah terlalu jauh dari pemain karena collision mencegah pemain mendekat.
+  const doorX=Number.isFinite(b.entranceX)?b.entranceX:b.x;
+  const doorZ=Number.isFinite(b.entranceZ)?b.entranceZ:(b.z+(b.depth||0)/2+2.55);
+  const d=Math.hypot(player.position.x-doorX,player.position.z-doorZ);
+  if(d<5.2&&d<dist){best={type:'building',name:b.name,building:b};dist=d;}
  }
  for(const board of cityInfoBoards){
   const d=Math.hypot(player.position.x-board.x,player.position.z-board.z);
@@ -5209,7 +5231,7 @@ function performReturnToWelcomeHome(){
   renderer.domElement.style.display='none';
   renderer.domElement.style.visibility='hidden';
  }
- ['topHud','locationTag','miniMapWrap','desktopHint','mobileControls','interaction','missionPanel','questMobileBtn'].forEach(id=>{
+ ['topHud','locationTag','accountStatusBadge','miniMapWrap','desktopHint','mobileControls','interaction','missionPanel','questMobileBtn'].forEach(id=>{
   const el=document.getElementById(id);if(el)el.style.display='none';
  });
  if(welcome){
@@ -5222,21 +5244,430 @@ function performReturnToWelcomeHome(){
  }
  showToast('Kamu kembali ke halaman utama.');
 }
+
+// ACCOUNT UI PREVIEW — independent registration/login with optional class code.
+
+// SUPABASE AUTH + PLAYER CLOUD DATA
+const AF_SUPABASE_URL='https://elhmrscynlluukloymnl.supabase.co';
+const AF_SUPABASE_PUBLISHABLE_KEY='sb_publishable_Wx2uIhLMRnBiWB-Zn8Q_oQ_aCYcYwM1';
+let afSupabase=null, afAuthUser=null, afCloudSaveTimer=null, afCloudLoading=false, afCloudReady=false, afGuestMode=false;
+
+function getAfSupabase(){
+ if(afSupabase)return afSupabase;
+ if(!window.supabase||!window.supabase.createClient)throw new Error('Library Supabase belum termuat. Periksa koneksi internet lalu muat ulang game.');
+ afSupabase=window.supabase.createClient(AF_SUPABASE_URL,AF_SUPABASE_PUBLISHABLE_KEY,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+ });
+ return afSupabase;
+}
+function accountErrorMessage(err){
+ const m=String(err?.message||err||'Terjadi kesalahan.');
+ if(/already registered|already exists/i.test(m))return 'Email ini sudah terdaftar. Silakan masuk.';
+ if(/invalid login credentials/i.test(m))return 'Email atau kata sandi tidak sesuai.';
+ if(/password/i.test(m)&&/least|short/i.test(m))return 'Kata sandi terlalu pendek. Gunakan minimal 8 karakter.';
+ if(/username/i.test(m)&&/duplicate|unique/i.test(m))return 'Username sudah digunakan. Pilih username lain.';
+ return m;
+}
+function afWithTimeout(promise,ms,message){
+ let timer;
+ const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);});
+ return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+}
+
+function openAccountAccess(tab='login'){
+ const render=()=>{
+  const signup=tab==='signup';
+  openModal(`<div class="max-w-md mx-auto text-slate-900">
+   <div class="text-center mb-4">
+    <div class="text-4xl mb-2">🌟</div>
+    <div class="text-2xl font-black">AL FAJAR UNIVERSE</div>
+    <p class="text-sm text-slate-500 mt-1">${signup?'Buat akun petualangmu':'Selamat datang kembali, petualang!'}</p>
+   </div>
+   <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 mb-4">
+    <button id="accountLoginTab" class="rounded-lg py-2 text-sm font-bold ${!signup?'bg-white shadow text-slate-900':'text-slate-500'}">Masuk</button>
+    <button id="accountSignupTab" class="rounded-lg py-2 text-sm font-bold ${signup?'bg-white shadow text-slate-900':'text-slate-500'}">Daftar Akun</button>
+   </div>
+   <div class="space-y-3">
+    ${signup?`<label class="block text-sm font-bold">Nama lengkap<input id="accountFullName" maxlength="40" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Nama kamu"></label>
+    <label class="block text-sm font-bold">Username<input id="accountUsername" maxlength="24" autocomplete="username" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Contoh: petualang123"></label>`:''}
+    <label class="block text-sm font-bold">Email<input id="accountEmail" type="email" maxlength="120" autocomplete="email" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="nama@email.com"></label>
+    <label class="block text-sm font-bold">Kata sandi<input id="accountPassword" type="password" minlength="8" autocomplete="${signup?'new-password':'current-password'}" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Minimal 8 karakter"></label>
+    ${signup?`<div class="grid grid-cols-2 gap-2"><label class="block text-sm font-bold">Jenjang<select id="accountGrade" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal"><option>SD</option><option>SMP</option><option>SMA</option><option>SMK</option></select></label><label class="block text-sm font-bold">Kelas<select id="accountClass" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal"></select></label></div>
+    <label class="block text-sm font-bold">Kode kelas <span class="font-normal text-slate-400">(opsional)</span><input id="accountClassCode" maxlength="20" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Isi jika diberikan guru"></label>`:''}
+   </div>
+   <button id="accountSubmit" class="w-full mt-5 rounded-xl p-3 text-white font-black" style="background:linear-gradient(135deg,#16b86a,#087b4a)">${signup?'Buat Akun':'Masuk ke Akun'}</button>
+   <p id="accountFeedback" class="text-xs text-center text-slate-600 mt-3">Akun dan progres akan disimpan secara online.</p>
+   <div class="text-center mt-2"><button id="accountPreviewClose" class="text-xs text-slate-500 underline">Tutup</button></div>
+  </div>`);
+  setTimeout(()=>{
+   const $=id=>document.getElementById(id);
+   $('accountLoginTab').onclick=()=>{tab='login';render();};
+   $('accountSignupTab').onclick=()=>{tab='signup';render();};
+   $('accountPreviewClose').onclick=closeModal;
+   if(signup){
+    const grade=$('accountGrade'),cls=$('accountClass');
+    const fill=()=>{const g=grade.value;const start=g==='SD'?1:g==='SMP'?7:10,end=g==='SD'?6:g==='SMP'?9:12;cls.innerHTML=Array.from({length:end-start+1},(_,i)=>`<option value="${start+i}">Kelas ${start+i}</option>`).join('');};
+    grade.onchange=fill;fill();
+   }
+   $('accountSubmit').onclick=async()=>{
+    const btn=$('accountSubmit'),feedback=$('accountFeedback');
+    const email=$('accountEmail').value.trim().toLowerCase();
+    const password=$('accountPassword').value;
+    btn.disabled=true;btn.textContent='Memproses...';
+    feedback.textContent='Menghubungkan ke server akun...';
+    try{
+     const sb=getAfSupabase();
+     if(signup){
+      const fullName=$('accountFullName').value.trim();
+      const username=$('accountUsername').value.trim().toLowerCase();
+      if(!fullName||!username||!email||!password)throw new Error('Lengkapi nama, username, email, dan kata sandi.');
+      if(!/^[a-z0-9_]{3,24}$/.test(username))throw new Error('Username harus 3–24 karakter, hanya huruf kecil, angka, dan garis bawah.');
+      if(password.length<8)throw new Error('Kata sandi minimal 8 karakter.');
+      const grade=$('accountGrade').value, classLevel=Number($('accountClass').value);
+      const classCode=$('accountClassCode').value.trim();
+      feedback.textContent='Mengirim pendaftaran ke server...';
+      const {data,error}=await afWithTimeout(sb.auth.signUp({
+       email,password,
+       options:{data:{username,display_name:fullName,grade,class_level:classLevel,class_code:classCode}}
+      }),15000,'Server akun belum merespons dalam 15 detik. Periksa koneksi internet, lalu coba lagi.');
+      if(error)throw error;
+      if(data.session){
+       afAuthUser=data.user;afGuestMode=false;
+       await loadAfCloudPlayer();
+       feedback.textContent='Akun berhasil dibuat! Menyiapkan karaktermu...';
+       showToast('Akun berhasil dibuat. Selamat datang, '+fullName+'!');
+       openCharacterCreator();
+      }else{
+       feedback.textContent='Pendaftaran diterima. Periksa email untuk menyelesaikan verifikasi akun.';
+       btn.disabled=false;btn.textContent='Daftar terkirim';
+      }
+     }else{
+      if(!email||!password)throw new Error('Masukkan email dan kata sandi.');
+      // Tandai bahwa pengguna sedang menuju sesi akun sebelum event SIGNED_IN dipancarkan.
+      try{localStorage.setItem('alfajar_session_mode','account');localStorage.setItem('alfajar_play_mode','account');}catch(e){}
+      afGuestMode=false;
+      feedback.textContent='Memverifikasi email dan kata sandi...';
+      const {data,error}=await afWithTimeout(
+       sb.auth.signInWithPassword({email,password}),
+       15000,
+       'Server akun belum merespons dalam 15 detik. Periksa koneksi internet, lalu coba masuk kembali.'
+      );
+      if(error)throw error;
+      afAuthUser=data.user;afGuestMode=false;
+      feedback.textContent='Login berhasil. Mengambil data karakter dan progres...';
+      // Data tamu tidak boleh dipakai sebagai data akun. Bersihkan cache tamu
+      // sebelum memeriksa karakter lokal atau mengambil data akun dari cloud.
+      const savedOwner=localStorage.getItem('alfajar_character_account_id');
+      const savedMode=localStorage.getItem('alfajar_session_mode')||localStorage.getItem('alfajar_play_mode');
+      if(savedOwner==='guest'||savedMode==='guest'){
+       resetLocalPlayerForGuest();
+       afGuestMode=false;afAuthUser=data.user;
+       try{
+        localStorage.removeItem('alfajar_character_account_id');
+        localStorage.setItem('alfajar_session_mode','account');
+        localStorage.setItem('alfajar_play_mode','account');
+       }catch(e){}
+      }
+      // Karakter lokal hanya dipercaya jika pemiliknya cocok dengan akun aktif.
+      // Cache lama tanpa penanda pemilik harus diverifikasi dari Supabase.
+      const localCharacter=localStorage.getItem('alfajar_character_name');
+      const localCreated=localStorage.getItem('alfajar_character_created')==='1';
+      const verifiedOwner=localStorage.getItem('alfajar_character_account_id');
+      const sameOwner=verifiedOwner===data.user.id;
+      const hasLocalCharacter=!!(localCreated&&localCharacter&&sameOwner);
+      if(hasLocalCharacter){
+       localStorage.setItem('alfajar_character_account_id',data.user.id);
+       localStorage.setItem('alfajar_session_mode','account');
+       localStorage.setItem('alfajar_play_mode','account');
+       feedback.textContent='Login berhasil. Membuka dunia 3D...';
+       closeModal();
+       showToast('Login berhasil. Memasuki dunia sambil menyinkronkan data...');
+       enterAlFajar('play',true);
+       // Tidak menunggu permintaan Supabase yang mungkin macet.
+       afWithTimeout(loadAfCloudPlayer(data.user),12000,'Sinkronisasi cloud tertunda')
+        .then(()=>{if(typeof updatePlayerNameTag==='function')updatePlayerNameTag();})
+        .catch(e=>console.warn('Sinkronisasi setelah login:',e));
+      }else{
+       feedback.textContent='Mencari karakter akunmu di cloud...';
+       const hasSavedCharacter=await afWithTimeout(loadAfCloudPlayer(data.user),12000,
+        'Data karakter belum merespons. Coba lagi dengan koneksi stabil.');
+       if(hasSavedCharacter){
+        localStorage.setItem('alfajar_character_account_id',data.user.id);
+        localStorage.setItem('alfajar_session_mode','account');
+        localStorage.setItem('alfajar_play_mode','account');
+        feedback.textContent='Karakter ditemukan. Membuka dunia 3D...';
+        closeModal();
+        enterAlFajar('play',true);
+       }else{
+        try{
+         localStorage.removeItem('alfajar_character_name');
+         localStorage.removeItem('alfajar_character_created');
+         localStorage.removeItem('alfajar_character_account_id');
+         localStorage.setItem('alfajar_session_mode','account');
+         localStorage.setItem('alfajar_play_mode','account');
+        }catch(e){}
+        closeModal();
+        showToast('Buat karakter pertamamu!');
+        openCharacterCreator();
+       }
+      }
+     }
+    }catch(err){
+     feedback.textContent=accountErrorMessage(err);
+     btn.disabled=false;btn.textContent=signup?'Buat Akun':'Masuk ke Akun';
+    }
+   };
+  },0);
+ };
+ render();
+}
+
+async function loadAfCloudPlayer(authUser=null){
+ const sb=getAfSupabase();
+ let user=authUser;
+ if(!user){
+  const authResult=await sb.auth.getUser();
+  if(authResult.error)throw authResult.error;
+  user=authResult.data?.user;
+ }
+ if(!user)throw new Error('Sesi akun tidak ditemukan.');
+ afAuthUser=user;
+ afCloudReady=false;
+ afCloudLoading=true;
+ let hasSavedCharacter=false;
+ try{
+  const [profileRes,progressRes,charRes]=await Promise.all([
+   sb.from('profiles').select('*').eq('id',user.id).maybeSingle(),
+   sb.from('player_progress').select('*').eq('user_id',user.id).maybeSingle(),
+   sb.from('player_characters').select('*').eq('user_id',user.id).maybeSingle()
+  ]);
+  for(const r of [profileRes,progressRes,charRes])if(r.error)throw r.error;
+  const p=profileRes.data,pr=progressRes.data,ch=charRes.data;
+  hasSavedCharacter=!!(ch && (
+   (ch.character_name && !['Petualang','Petualang Baru'].includes(ch.character_name.trim())) ||
+   (ch.appearance && Object.keys(ch.appearance).length>0)
+  ));
+  if(p){
+   selectedGrade=p.grade||selectedGrade;selectedClass=Number(p.class_level)||selectedClass;
+   try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+  }
+  if(pr){
+   xp=Number(pr.xp)||0;coins=Number(pr.coins)||0;playerLevel=Math.max(1,Number(pr.level)||1);
+   try{localStorage.setItem('alfajar_wallet_v21',JSON.stringify({xp,coins,level:playerLevel}));}catch(e){}
+   if(pr.checkpoint&&typeof pr.checkpoint==='object'){
+    try{localStorage.setItem('alfajar_game_checkpoint_v1',JSON.stringify(pr.checkpoint));}catch(e){}
+   }
+   bookCount=Math.max(Number(bookCount)||0,Number(pr.books_collected)||0);
+   schoolVisited=!!pr.school_visited;guideVisited=!!pr.guide_visited;
+  }
+  if(ch){
+   try{
+    localStorage.setItem('alfajar_character_name',ch.character_name||p?.display_name||'Petualang');
+    localStorage.setItem('alfajar_character_created','1');
+    localStorage.setItem('alfajar_character_account_id',user.id);
+    if(ch.appearance&&Object.keys(ch.appearance).length){
+     Object.assign(avatarState,ch.appearance);
+     localStorage.setItem('alfajar_avatar_v21',JSON.stringify(avatarState));
+     if(typeof applyAvatarLook==='function')applyAvatarLook();
+    }
+    // Perbarui label nama yang sudah terlanjur dirender sebelum data cloud selesai dimuat.
+    if(typeof updatePlayerNameTag==='function')updatePlayerNameTag();
+   }catch(e){}
+  }
+  refreshWalletUI();
+  refreshWorldChoice();
+ }finally{afCloudLoading=false;}
+ afCloudReady=true;
+
+ // Inventaris, hadiah, dan misi dimuat di belakang layar agar tidak menahan login.
+ Promise.all([
+  sb.from('player_inventory').select('item_id').eq('user_id',user.id),
+  sb.from('player_rewards').select('reward_id,claimed_at,amount:xp_amount').eq('user_id',user.id),
+  sb.from('player_missions').select('*').eq('user_id',user.id)
+ ]).then(([inventoryRes,rewardRes,missionRes])=>{
+  for(const r of [inventoryRes,rewardRes,missionRes])if(r.error)throw r.error;
+  if(inventoryRes.data){
+   const cloudItems=inventoryRes.data.map(r=>r.item_id).filter(Boolean);
+   ownedShopItems=[...new Set([...(Array.isArray(ownedShopItems)?ownedShopItems:[]),...cloudItems])];
+   try{localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));}catch(e){}
+  }
+  if(rewardRes.data){
+   const cloudLedger={};
+   rewardRes.data.forEach(r=>cloudLedger[r.reward_id]={claimedAt:r.claimed_at,amount:r.amount||0});
+   afRewardLedger={...(afRewardLedger||{}),...cloudLedger};
+   try{localStorage.setItem(AF_REWARD_LEDGER_KEY,JSON.stringify(afRewardLedger));}catch(e){}
+  }
+  if(missionRes.data){
+   missionRes.data.forEach(m=>{questState[m.mission_id]={progress:m.progress||0,claimed:!!m.claimed};});
+   try{localStorage.setItem('alfajar_quests_v20',JSON.stringify(questState));}catch(e){}
+  }
+ }).catch(e=>console.warn('AL FAJAR data tambahan:',e));
+
+ return hasSavedCharacter;
+}
+function queueAfCloudSave(){
+ if(afGuestMode||!afAuthUser||afCloudLoading||!afCloudReady)return;
+ clearTimeout(afCloudSaveTimer);
+ afCloudSaveTimer=setTimeout(()=>saveAfCloudPlayer().catch(e=>console.warn('Cloud save:',e)),1200);
+}
+async function saveAfCloudPlayer(){
+ if(afGuestMode||!afAuthUser||afCloudLoading||!afCloudReady)return;
+ const sb=getAfSupabase(),uid=afAuthUser.id;
+ const owner=localStorage.getItem('alfajar_character_account_id');
+ const mode=localStorage.getItem('alfajar_session_mode')||localStorage.getItem('alfajar_play_mode')||'';
+ // Simpan hanya jika identitas karakter memang dimiliki akun aktif.
+ if(mode==='guest'||owner!==uid)return;
+ const checkpoint=(()=>{try{return JSON.parse(localStorage.getItem('alfajar_game_checkpoint_v1')||'{}');}catch(e){return {};}})();
+ const wallet={xp,coins,level:playerLevel};
+ const payload={user_id:uid,xp,coins,level:playerLevel,books_collected:Number(bookCount)||0,
+  school_visited:!!schoolVisited,guide_visited:!!guideVisited,checkpoint};
+ const [progressRes,charRes]=await Promise.all([
+  sb.from('player_progress').upsert(payload,{onConflict:'user_id'}),
+  sb.from('player_characters').upsert({
+   user_id:uid,
+   character_name:localStorage.getItem('alfajar_character_name')||'Petualang',
+   appearance:avatarState||{}
+  },{onConflict:'user_id'})
+ ]);
+ if(progressRes.error)throw progressRes.error;
+ if(charRes.error)throw charRes.error;
+ // Save current mission states separately.
+ const missions=Object.entries(questState||{}).map(([mission_id,s])=>({
+  user_id:uid,mission_id,progress:Number(s.progress)||0,completed:(Number(s.progress)||0)>=((questDefs.find(q=>q.id===mission_id)||{}).goal||1),
+  claimed:!!s.claimed,state:{}
+ }));
+ if(missions.length){
+  const mr=await sb.from('player_missions').upsert(missions,{onConflict:'user_id,mission_id'});
+  if(mr.error)throw mr.error;
+ }
+ // Simpan kepemilikan kosmetik di tabel inventaris akun.
+ const owned=[...new Set(Array.isArray(ownedShopItems)?ownedShopItems:[])];
+ if(owned.length){
+  const inventory=owned.map(item_id=>({user_id:uid,item_id,quantity:1,metadata:{source:'shop_or_starter'}}));
+  const ir=await sb.from('player_inventory').upsert(inventory,{onConflict:'user_id,item_id'});
+  if(ir.error)throw ir.error;
+ }
+ // Pastikan catatan hadiah lokal yang belum tersalin ikut masuk ke akun.
+ const rewardRows=Object.entries(afRewardLedger||{}).map(([reward_id,r])=>({
+  user_id:uid,reward_id,xp_amount:Number(r.amount)||0,coins_amount:Math.max(1,Math.floor((Number(r.amount)||0)/5))
+ }));
+ if(rewardRows.length){
+  const rr=await sb.from('player_rewards').upsert(rewardRows,{onConflict:'user_id,reward_id',ignoreDuplicates:true});
+  if(rr.error)throw rr.error;
+ }
+}
+function updateAccountStatusUI(){
+ const badge=document.getElementById('accountStatusBadge');
+ const label=document.getElementById('accountStatusBadgeText');
+ if(!badge||!label)return;
+ const isAccount=!!(afAuthUser&&!afGuestMode);
+ const name=isAccount
+  ? (afAuthUser.user_metadata?.display_name||afAuthUser.user_metadata?.full_name||afAuthUser.email||'Akun')
+  : (localStorage.getItem('alfajar_character_name')||'Pemain Tamu');
+ label.textContent=isAccount?`AKUN · ${name}`:'MODE TAMU';
+ badge.classList.toggle('border-emerald-300/70',isAccount);
+ badge.classList.toggle('border-amber-300/70',!isAccount);
+ badge.title=isAccount?'Sedang bermain menggunakan akun terdaftar':'Sedang bermain sebagai tamu';
+}
+function openAccountStatusInfo(){
+ const isAccount=!!(afAuthUser&&!afGuestMode);
+ const email=isAccount?(afAuthUser.email||'Email tidak tersedia'):'Tidak ada akun yang sedang masuk';
+ const displayName=isAccount
+  ? (afAuthUser.user_metadata?.display_name||afAuthUser.user_metadata?.full_name||'Pengguna akun')
+  : (localStorage.getItem('alfajar_character_name')||'Pemain Tamu');
+ const character=localStorage.getItem('alfajar_character_name')||'Belum dibuat';
+ const action=isAccount
+  ? `<button id="accountStatusSignOut" class="w-full rounded-xl p-3 font-black text-white" style="background:linear-gradient(135deg,#dc5656,#a92d3b)">Keluar dari Akun</button>`
+  : `<button id="accountStatusLogin" class="w-full rounded-xl p-3 font-black text-white" style="background:linear-gradient(135deg,#16b86a,#087b4a)">Masuk ke Akun</button>`;
+ openModal(`<div class="max-w-sm mx-auto text-center">
+  <div class="text-4xl mb-2">${isAccount?'🔐':'🎮'}</div>
+  <div class="text-xl font-black text-slate-900">Informasi Sesi</div>
+  <div class="inline-flex items-center gap-2 rounded-full px-3 py-1 mt-3 text-xs font-black ${isAccount?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">
+   <span class="w-2 h-2 rounded-full ${isAccount?'bg-emerald-500':'bg-amber-500'}"></span>${isAccount?'LOGIN DENGAN AKUN':'BERMAIN SEBAGAI TAMU'}
+  </div>
+  <div class="text-left rounded-xl bg-slate-100 p-3 mt-4 space-y-2 text-sm">
+   <div><div class="text-xs text-slate-500 font-bold">STATUS</div><div class="font-bold text-slate-800">${isAccount?'Akun terhubung':'Sesi tamu aktif'}</div></div>
+   <div><div class="text-xs text-slate-500 font-bold">IDENTITAS</div><div class="font-bold text-slate-800 break-all">${displayName}</div></div>
+   <div><div class="text-xs text-slate-500 font-bold">EMAIL AKUN</div><div class="font-bold text-slate-800 break-all">${email}</div></div>
+   <div><div class="text-xs text-slate-500 font-bold">NAMA KARAKTER</div><div class="font-bold text-slate-800">${character}</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-3">${isAccount?'Progres akan disimpan ke akun ini selama sesi akun aktif.':'Progres tamu disimpan di perangkat ini dan tidak tersinkron ke akun.'}</p>
+  <div class="mt-4">${action}</div>
+  <button id="accountStatusClose" class="mt-3 text-sm text-slate-500 underline">Tutup</button>
+ </div>`);
+ setTimeout(()=>{
+  document.getElementById('accountStatusClose')?.addEventListener('click',closeModal);
+  document.getElementById('accountStatusSignOut')?.addEventListener('click',()=>{closeModal();signOutAfAccount();});
+  document.getElementById('accountStatusLogin')?.addEventListener('click',()=>{closeModal();openAccountAccess('login');});
+ },0);
+}
+function signOutAfAccount(){
+ const sb=getAfSupabase();
+ sb.auth.signOut().then(({error})=>{
+  if(error){showToast(accountErrorMessage(error));return;}
+  afAuthUser=null;afGuestMode=false;afCloudReady=false;
+  clearTimeout(afCloudSaveTimer);
+  try{localStorage.setItem('alfajar_play_mode','signedout');localStorage.setItem('alfajar_session_mode','signedout');}catch(e){}
+  updateAccountStatusUI();
+  showToast('Kamu sudah keluar dari akun. Pilih Main untuk bermain sebagai tamu.');
+  performReturnToWelcomeHome();
+ }).catch(e=>showToast(accountErrorMessage(e)));
+}
+
+function resetLocalPlayerForGuest(){
+ clearTimeout(afCloudSaveTimer);
+ const keys=['alfajar_wallet_v21','alfajar_game_checkpoint_v1','alfajar_quests_v20','alfajar_owned_items_v21',AF_REWARD_LEDGER_KEY,'alfajar_character_name','alfajar_character_created','alfajar_character_account_id','alfajar_avatar_v21','alfajar_session_mode'];
+ try{keys.forEach(k=>localStorage.removeItem(k));}catch(e){}
+ xp=0;coins=0;playerLevel=1;bookCount=0;schoolVisited=false;guideVisited=false;
+ questState={};questDefs.forEach(q=>{questState[q.id]={progress:0,claimed:false};});
+ ownedShopItems=['outfit_blue','wear_bag'];afRewardLedger={};
+ Object.assign(avatarState,{gender:'Laki-laki',skin:0xd99b72,hair:0x3c2d28,outfit:0x347fca,wear:'Tas'});
+ player.position.set(0,0,13);refreshWalletUI();
+ try{
+  localStorage.setItem('alfajar_wallet_v21',JSON.stringify({xp:0,coins:0,level:1}));
+  localStorage.setItem('alfajar_quests_v20',JSON.stringify(questState));
+  localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));
+  localStorage.setItem(AF_REWARD_LEDGER_KEY,JSON.stringify({}));
+  localStorage.setItem('alfajar_play_mode','guest');localStorage.setItem('alfajar_session_mode','guest');
+  localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));
+  localStorage.setItem('alfajar_character_account_id','guest');
+ }catch(e){}
+}
 function enterAlFajar(mode='play',characterReady=false){
- // Setiap sesi Main dimulai dari studio karakter; flag lama di perangkat tidak boleh melewati langkah ini.
- if(mode==='play' && !characterReady){
+ if(mode==='student'){openAccountAccess('login');return;}
+ if(mode==='play'&&!characterReady){
+  // Main adalah jalur tamu. Sesi Supabase yang mungkin masih aktif tidak boleh
+  // menerima penyimpanan progres dari sesi tamu.
+  afGuestMode=true;
+  afAuthUser=null;
+  afCloudReady=false;
+  resetLocalPlayerForGuest();
+  // Main harus menjadi sesi tamu sungguhan, bukan sekadar menyembunyikan akun aktif.
+  try{localStorage.setItem('alfajar_session_mode','guest');localStorage.setItem('alfajar_play_mode','guest');}catch(e){}
+  try{
+   const guestSb=getAfSupabase();
+   guestSb.auth.signOut().then(({error})=>{
+    if(error)console.warn('Pembersihan sesi akun saat masuk tamu:',error);
+    // Event SIGNED_OUT tidak boleh mengubah mode tamu.
+    afGuestMode=true;afAuthUser=null;afCloudReady=false;
+   }).catch(e=>console.warn('Pembersihan sesi akun:',e));
+  }catch(e){console.warn('Supabase guest sign-out:',e);}
+  updateAccountStatusUI();
   openCharacterCreator();
   return;
  }
+ if(mode==='teacher'){afGuestMode=false;}
+
  window.__afDiag('Tombol Main ditekan; masuk ke dunia 3D.');
  const welcome=document.getElementById('welcomeScreen');
  const gameMount=document.getElementById('game');
  if(gameMount){gameMount.style.visibility='visible';gameMount.style.display='block';}
  if(renderer&&renderer.domElement){renderer.domElement.style.visibility='visible';renderer.domElement.style.display='block';}
  if(welcome){welcome.classList.add('leaving');if(soundOn){initAudio();startGameMusic();}setTimeout(()=>{welcome.style.display='none';try{camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.render(scene,camera);}catch(e){console.warn('AL FAJAR start render:',e);}},760);}
- ['topHud','locationTag','miniMapWrap','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
+ ['topHud','locationTag','accountStatusBadge','miniMapWrap','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
  const hint=document.getElementById('desktopHint');if(hint)hint.style.display='';
  const loc=document.getElementById('locationTag');if(loc)loc.innerHTML=`<i class="fa-solid fa-location-dot text-amber-300 mr-1"></i> AL FAJAR CITY · ${selectedGrade} KELAS ${selectedClass}`;
+ updateAccountStatusUI();
  const playerName=localStorage.getItem('alfajar_character_name')||'Petualang';
  showToast(mode==='teacher'?'Selamat datang di ruang guru!':`Selamat datang, ${playerName}! · ${selectedGrade} Kelas ${selectedClass}`);
  if(mode==='student')setTimeout(()=>document.getElementById('studentBtn')?.click(),500);
@@ -5278,7 +5709,7 @@ function openCharacterCreator(){
     <select id="avWear" class="mt-2 w-full bg-white rounded-lg p-2"><option value="Tas">Tas sekolah</option><option value="Topi">Topi</option><option value="Kacamata">Kacamata</option><option value="Tanpa">Tanpa aksesori</option></select>
    </label>
   </div>
-  <p class="text-xs text-slate-500 mt-3">Karakter dan namamu akan disimpan di perangkat ini. Kamu tetap bisa mengubah penampilan melalui menu Avatar.</p>
+  <p class="text-xs text-slate-500 mt-3">${afGuestMode?'Mode tamu: karakter dan progres disimpan di perangkat ini saja. Untuk menyimpan progres secara online dan melanjutkan di perangkat lain, gunakan Masuk atau Daftar Akun.':'Karakter dan penampilanmu akan disimpan di akun agar dapat dilanjutkan saat masuk kembali. Kamu tetap bisa mengubahnya melalui menu Avatar.'}</p>
   <button id="creatorStart" class="mt-4 w-full rounded-xl p-4 text-white font-black text-lg" style="background:linear-gradient(135deg,#16b86a,#087b4a);box-shadow:0 5px 0 #075b38">✓ Simpan Karakter & Mulai Bermain</button>
  </div>`);
  setTimeout(()=>{
@@ -5303,9 +5734,24 @@ function openCharacterCreator(){
    avatarState.hair=parseInt($('avHair').value,16);
    avatarState.outfit=parseInt($('avOutfit').value,16);
    avatarState.wear=$('avWear').value;
-   try{localStorage.setItem('alfajar_character_name',name);localStorage.setItem('alfajar_character_created','1');}catch(e){}
+   try{
+    localStorage.setItem('alfajar_character_name',name);
+    localStorage.setItem('alfajar_character_created','1');
+    localStorage.setItem('alfajar_selected_grade',selectedGrade);
+    localStorage.setItem('alfajar_selected_class',String(selectedClass));
+    if(afGuestMode){
+     localStorage.setItem('alfajar_session_mode','guest');
+     localStorage.setItem('alfajar_play_mode','guest');
+     localStorage.setItem('alfajar_character_account_id','guest');
+    }else{
+     localStorage.setItem('alfajar_session_mode','account');
+     localStorage.setItem('alfajar_play_mode','account');
+     if(afAuthUser?.id)localStorage.setItem('alfajar_character_account_id',afAuthUser.id);
+    }
+   }catch(e){}
    updatePlayerNameTag();
    applyAvatarLook();
+   if(!afGuestMode)queueAfCloudSave();
    closeModal();
    showToast('Karakter '+name+' siap berpetualang!');
    enterAlFajar('play',true);
@@ -5314,6 +5760,7 @@ function openCharacterCreator(){
 }
 
 window.enterAlFajar=enterAlFajar;
+window.signOutAfAccount=signOutAfAccount;
 function refreshWorldChoice(){
  document.querySelectorAll('.gradeWorldBtn').forEach(btn=>{
   const active=btn.dataset.grade===selectedGrade;
@@ -5360,8 +5807,36 @@ document.getElementById('welcomePlay').onclick=()=>enterAlFajar('play');
 document.getElementById('welcomePlayTop').onclick=()=>enterAlFajar('play');
 document.getElementById('welcomeLogin').onclick=()=>enterAlFajar('student');
 document.getElementById('welcomeTeacher').onclick=()=>enterAlFajar('teacher');
+ // Pulihkan sesi dengan menghormati mode terakhir: tamu dan akun tidak boleh bercampur.
+ (async()=>{try{
+  const sb=getAfSupabase();
+  const storedMode=localStorage.getItem('alfajar_session_mode')||localStorage.getItem('alfajar_play_mode')||'';
+  const persistedGuest=storedMode==='guest';
+  if(persistedGuest){afGuestMode=true;afAuthUser=null;afCloudReady=false;}
+  sb.auth.onAuthStateChange((event,session)=>{
+   const modeNow=localStorage.getItem('alfajar_session_mode')||localStorage.getItem('alfajar_play_mode')||'';
+   if(modeNow==='guest'||afGuestMode){
+    // Abaikan sesi Supabase selama pemain berada di mode tamu.
+    afGuestMode=true;afAuthUser=null;afCloudReady=false;
+    if(event==='SIGNED_IN')setTimeout(()=>{try{sb.auth.signOut();}catch(e){}},0);
+    return;
+   }
+   if(event==='SIGNED_IN'){afAuthUser=session?.user||null;afGuestMode=false;updateAccountStatusUI();}
+   else if(event==='SIGNED_OUT'){afAuthUser=null;afGuestMode=false;afCloudReady=false;updateAccountStatusUI();}
+   else{afAuthUser=session?.user||null;}
+  });
+  const {data:{session}}=await sb.auth.getSession();
+  if(persistedGuest){
+   afGuestMode=true;afAuthUser=null;afCloudReady=false;
+   if(session)await sb.auth.signOut();
+  }else if(session){
+   afAuthUser=session.user;afGuestMode=false;
+   // Data cloud tetap dimuat hanya setelah pengguna memilih Masuk.
+  }
+ }catch(e){console.warn('Supabase session:',e);}})();
+
  document.getElementById('returnHomeBtn').onclick=returnToWelcomeHome;
-['topHud','locationTag','miniMapWrap','desktopHint','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+['topHud','locationTag','accountStatusBadge','miniMapWrap','desktopHint','mobileControls'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
 
 // Smart HUD: feature buttons remain wired to their existing handlers, but live in one categorized drawer.
 (function(){
