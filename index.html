@@ -5577,7 +5577,10 @@ function openAccountStatusInfo(){
   : (localStorage.getItem('alfajar_character_name')||'Pemain Tamu');
  const character=localStorage.getItem('alfajar_character_name')||'Belum dibuat';
  const action=isAccount
-  ? `<button id="accountStatusSignOut" class="w-full rounded-xl p-3 font-black text-white" style="background:linear-gradient(135deg,#dc5656,#a92d3b)">Keluar dari Akun</button>`
+  ? `<div class="space-y-2">
+      <button id="accountEditCharacter" class="w-full rounded-xl p-3 font-black text-slate-900" style="background:linear-gradient(135deg,#f6d36d,#e9a92d)"><i class="fa-solid fa-pen-to-square mr-2"></i>Edit Profil Karakter</button>
+      <button id="accountStatusSignOut" class="w-full rounded-xl p-3 font-black text-white" style="background:linear-gradient(135deg,#dc5656,#a92d3b)">Keluar dari Akun</button>
+     </div>`
   : `<button id="accountStatusLogin" class="w-full rounded-xl p-3 font-black text-white" style="background:linear-gradient(135deg,#16b86a,#087b4a)">Masuk ke Akun</button>`;
  openModal(`<div class="max-w-sm mx-auto text-center">
   <div class="text-4xl mb-2">${isAccount?'🔐':'🎮'}</div>
@@ -5597,9 +5600,67 @@ function openAccountStatusInfo(){
  </div>`);
  setTimeout(()=>{
   document.getElementById('accountStatusClose')?.addEventListener('click',closeModal);
+  document.getElementById('accountEditCharacter')?.addEventListener('click',openCharacterProfileEditor);
   document.getElementById('accountStatusSignOut')?.addEventListener('click',()=>{closeModal();signOutAfAccount();});
   document.getElementById('accountStatusLogin')?.addEventListener('click',()=>{closeModal();openAccountAccess('login');});
  },0);
+}
+function openCharacterProfileEditor(){
+ if(!afAuthUser||afGuestMode){showToast('Fitur edit profil hanya tersedia untuk akun yang login.');return;}
+ const current=(localStorage.getItem('alfajar_character_name')||'Petualang').trim();
+ openModal(`<div class="max-w-sm mx-auto">
+  <div class="text-center text-3xl mb-2">✏️</div>
+  <h3 class="text-xl font-black text-slate-900 text-center">Edit Profil Karakter</h3>
+  <p class="text-sm text-slate-600 text-center mt-1">Ubah nama karakter yang tampil di dunia AL FAJAR.</p>
+  <label for="editCharacterName" class="block text-xs font-extrabold text-slate-600 mt-5 mb-2">NAMA KARAKTER</label>
+  <input id="editCharacterName" type="text" maxlength="18" value="${current.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" class="w-full rounded-xl border-2 border-slate-200 p-3 text-slate-900 font-bold outline-none focus:border-amber-400" placeholder="Masukkan nama karakter">
+  <p class="text-xs text-slate-500 mt-2">Maksimal 18 karakter agar nama tetap terlihat jelas di atas avatar.</p>
+  <div id="editCharacterFeedback" class="text-xs font-bold mt-3 text-center text-rose-600"></div>
+  <div class="grid grid-cols-2 gap-2 mt-4">
+   <button id="cancelCharacterEdit" class="rounded-xl p-3 font-black bg-slate-200 text-slate-700">Batal</button>
+   <button id="saveCharacterEdit" class="rounded-xl p-3 font-black text-slate-900" style="background:linear-gradient(135deg,#f6d36d,#e9a92d)">Simpan</button>
+  </div>
+ </div>`);
+ setTimeout(()=>{
+  document.getElementById('cancelCharacterEdit')?.addEventListener('click',openAccountStatusInfo);
+  document.getElementById('saveCharacterEdit')?.addEventListener('click',saveCharacterProfileName);
+  document.getElementById('editCharacterName')?.focus();
+ },0);
+}
+async function saveCharacterProfileName(){
+ const input=document.getElementById('editCharacterName');
+ const feedback=document.getElementById('editCharacterFeedback');
+ const button=document.getElementById('saveCharacterEdit');
+ const name=(input?.value||'').trim().replace(/\\s+/g,' ');
+ if(!afAuthUser||afGuestMode){if(feedback)feedback.textContent='Sesi akun tidak aktif. Silakan login kembali.';return;}
+ if(!name){if(feedback)feedback.textContent='Nama karakter tidak boleh kosong.';input?.focus();return;}
+ if(name.length>18){if(feedback)feedback.textContent='Nama maksimal 18 karakter.';input?.focus();return;}
+ const uid=afAuthUser.id;
+ if(localStorage.getItem('alfajar_character_account_id')!==uid){
+  if(feedback)feedback.textContent='Data karakter tidak cocok dengan akun ini. Muat ulang sesi akun terlebih dahulu.';
+  return;
+ }
+ if(button){button.disabled=true;button.textContent='Menyimpan...';}
+ try{
+  const sb=getAfSupabase();
+  const {error}=await sb.from('player_characters').upsert({
+   user_id:uid,
+   character_name:name,
+   appearance:avatarState||{}
+  },{onConflict:'user_id'});
+  if(error)throw error;
+  localStorage.setItem('alfajar_character_name',name);
+  localStorage.setItem('alfajar_character_account_id',uid);
+  localStorage.setItem('alfajar_character_created','1');
+  if(typeof updatePlayerNameTag==='function')updatePlayerNameTag();
+  if(typeof updateAccountStatusUI==='function')updateAccountStatusUI();
+  showToast('Nama karakter berhasil diperbarui!');
+  openAccountStatusInfo();
+ }catch(error){
+  console.error('Gagal memperbarui nama karakter:',error);
+  if(feedback)feedback.textContent=accountErrorMessage(error)||'Nama karakter gagal disimpan. Coba lagi.';
+  if(button){button.disabled=false;button.textContent='Simpan';}
+ }
 }
 function signOutAfAccount(){
  const sb=getAfSupabase();
