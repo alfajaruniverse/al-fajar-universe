@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>AL FAJAR UNIVERSE v19.1 — Game Edukasi 3D Khusus SD</title><meta name="description" content="AL FAJAR UNIVERSE — dunia belajar virtual 3D khusus siswa Sekolah Dasar kelas 1 sampai 6.">
+<title>AL FAJAR UNIVERSE v19.3 — Import Konten Guru</title><meta name="description" content="AL FAJAR UNIVERSE — dunia belajar virtual 3D khusus siswa Sekolah Dasar kelas 1 sampai 6.">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3557,6 +3557,145 @@ function learningPathPanel(subject,grade){
  setTimeout(()=>{const b=document.getElementById('pathStartQuiz');if(b)b.onclick=()=>startQuiz(subject,grade,'Semua');},0);
 }
 function teacherQuestionBank(){teacherDashboard('questions');}
+
+// IMPORT CENTER v1 — Word untuk materi/soal, Excel/CSV untuk bank soal.
+let teacherImportDraft=null;
+function loadAfImportLibrary(src,globalName){
+ return new Promise((resolve,reject)=>{
+  if(window[globalName]){resolve(window[globalName]);return;}
+  const existing=document.querySelector('script[data-af-import="'+globalName+'"]');
+  if(existing){existing.addEventListener('load',()=>resolve(window[globalName]),{once:true});existing.addEventListener('error',()=>reject(new Error('Library gagal dimuat. Periksa koneksi internet.')),{once:true});return;}
+  const sc=document.createElement('script');sc.src=src;sc.async=true;sc.dataset.afImport=globalName;
+  sc.onload=()=>window[globalName]?resolve(window[globalName]):reject(new Error('Library tidak tersedia.'));
+  sc.onerror=()=>reject(new Error('Library gagal dimuat. Periksa koneksi internet.'));
+  document.head.appendChild(sc);
+ });
+}
+function afNormalizeHeader(v){return String(v||'').toLowerCase().trim().replace(/[\s_\-./()]+/g,'').replace(/[^a-z0-9]/g,'');}
+function afPick(row,keys){
+ const entries=Object.entries(row||{}),wanted=keys.map(afNormalizeHeader);
+ const found=entries.find(([k,v])=>wanted.includes(afNormalizeHeader(k))&&String(v??'').trim()!=='');
+ return found?String(found[1]).trim():'';
+}
+function afQuestionFromRow(row,index,meta){
+ const question=afPick(row,['pertanyaan','soal','question','questions','tekssoal']);
+ if(!question)return null;
+ const options=['A','B','C','D'].map(k=>afPick(row,[k,'opsi'+k,'pilihan'+k,'option'+k])).filter(Boolean);
+ const rawType=afPick(row,['jenis','tipe','type']).toLowerCase();
+ const rawAnswer=afPick(row,['kunci','jawaban','answer','key','correctanswer']);
+ let type=rawType.includes('isian')||rawType.includes('short')?'short':rawType.includes('benar')||rawType==='tf'?'tf':(options.length>=2?'mcq':'short');
+ let answer=rawAnswer;
+ if(type==='mcq'&&/^[a-d]$/i.test(answer))answer=options[answer.toUpperCase().charCodeAt(0)-65]||answer;
+ if(type==='tf'){
+  const low=answer.toLowerCase();answer=['benar','true','ya'].includes(low)?'Benar':['salah','false','tidak'].includes(low)?'Salah':answer;
+  if(!options.length)options.push('Benar','Salah');
+ }
+ return {id:'imp_'+Date.now().toString(36)+'_'+index+'_'+Math.random().toString(36).slice(2,6),subject:afPick(row,['mapel','matapelajaran','subject'])||meta.subject,grade:'SD',classLevel:meta.classLevel,chapter:afPick(row,['bab','chapter'])||meta.chapter,topic:afPick(row,['topik','topic'])||meta.chapter,difficulty:afPick(row,['kesulitan','tingkatkesulitan','difficulty'])||'Dasar',type,question,options:type==='short'?[]:options,answer,explanation:afPick(row,['pembahasan','penjelasan','explanation','ulasan'])||'Pembahasan belum ditambahkan.'};
+}
+function afParseQuestionDocxText(text,meta){
+ const lines=String(text||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);
+ const blocks=[];let current=null;
+ const startRe=/^(?:soal\s*)?\d{1,3}\s*[.)\-:]\s*(.+)$/i;
+ for(const line of lines){
+  const sm=line.match(startRe);
+  if(sm){if(current)blocks.push(current);current={question:sm[1],options:{},answer:'',explanation:''};continue;}
+  if(!current)continue;
+  const om=line.match(/^([A-D])\s*[.)\-:]\s*(.+)$/i);
+  if(om){current.options[om[1].toUpperCase()]=om[2];continue;}
+  const am=line.match(/^(?:kunci(?:\s+jawaban)?|jawaban|answer)\s*[:\-]\s*(.+)$/i);
+  if(am){current.answer=am[1].trim();continue;}
+  const em=line.match(/^(?:pembahasan|penjelasan|explanation)\s*[:\-]\s*(.+)$/i);
+  if(em){current.explanation=em[1].trim();continue;}
+  current.explanation+=(current.explanation?' ':'')+line;
+ }
+ if(current)blocks.push(current);
+ return blocks.map((b,i)=>{
+  const options=['A','B','C','D'].map(k=>b.options[k]).filter(Boolean);
+  let type=options.length>=2?'mcq':'short',answer=b.answer;
+  if(type==='mcq'&&/^[a-d]$/i.test(answer))answer=b.options[answer.toUpperCase()];
+  return {id:'impdoc_'+Date.now().toString(36)+'_'+i,subject:meta.subject,grade:'SD',classLevel:meta.classLevel,chapter:meta.chapter,topic:meta.chapter,difficulty:'Dasar',type,question:b.question,options:type==='mcq'?options:[],answer,explanation:b.explanation||'Pembahasan belum ditambahkan.'};
+ });
+}
+function teacherImportCenter(mode){
+ const isQ=mode==='questions';
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-file-import text-violet-300 mr-2"></i>${isQ?'IMPORT BANK SOAL':'IMPORT MATERI'}</div>
+ <p class="text-xs text-blue-100 mb-3">Unggah dokumen, periksa hasil pembacaan, lalu pilih konten yang akan dimasukkan. Konten lama tidak akan ditimpa.</p>
+ <div class="grid grid-cols-2 gap-2 mb-3">
+  <label class="text-xs text-blue-100">Mata pelajaran<select id="afImportSubject" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white"><option>Matematika</option><option>Bahasa Indonesia</option><option>IPAS</option><option>Pendidikan Pancasila</option><option>Bahasa Inggris</option><option>Seni Musik</option><option>Seni Rupa</option><option>PJOK</option></select></label>
+  <label class="text-xs text-blue-100">Kelas<select id="afImportClass" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${selectedClass===n?'selected':''}>Kelas ${n}</option>`).join('')}</select></label>
+ </div>
+ <label class="block text-xs text-blue-100 mb-2">Nama bab / topik<input id="afImportChapter" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" placeholder="Contoh: Bab 1 - Bilangan Cacah"></label>
+ <div class="rounded-xl border border-dashed border-sky-300/40 bg-sky-500/10 p-4 text-center mb-3">
+  <i class="fa-solid ${isQ?'fa-file-excel':'fa-file-word'} text-3xl text-sky-200"></i>
+  <p class="font-extrabold mt-2">${isQ?'Pilih Excel, CSV, atau Word (.docx)':'Pilih dokumen Word (.docx) atau teks (.txt)'}</p>
+  <p class="text-[11px] text-blue-100 mt-1">${isQ?'Excel/CSV: kolom Pertanyaan, A, B, C, D, Kunci, Pembahasan. Word: satu soal per nomor.':'Isi dokumen akan dijadikan satu materi. Judul diambil dari nama file.'}</p>
+  <input id="afImportFile" type="file" class="block w-full mt-3 text-xs text-blue-100" accept="${isQ?'.xlsx,.xls,.csv,.docx,.txt':'.docx,.txt'}">
+ </div>
+ <div id="afImportStatus" class="text-xs text-blue-100 mb-2">Belum ada file dipilih.</div>
+ <div id="afImportPreview"></div>
+ <div class="flex gap-2 mt-3"><button id="afImportCancel" class="flex-1 bg-white/10 rounded-xl p-3 font-bold">BATAL</button><button id="afImportCommit" disabled class="flex-1 bg-emerald-500/50 text-white/60 rounded-xl p-3 font-extrabold cursor-not-allowed">IMPORT 0 ITEM</button></div>
+ <div class="flex flex-wrap gap-2 mt-2"><button id="afDownloadTemplate" class="text-xs rounded-lg bg-sky-500/20 border border-sky-300/20 px-3 py-2 text-cyan-100"><i class="fa-solid fa-download mr-1"></i>${isQ?'Unduh Template Soal CSV':'Unduh Template Materi TXT'}</button>${isQ?'<button id="afWordFormat" class="text-xs rounded-lg bg-white/10 px-3 py-2 text-blue-100">Lihat Format Word</button>':''}</div><p class="text-[10px] text-blue-200 mt-2">Catatan: file dibaca di browser. Untuk DOCX/XLSX diperlukan koneksi internet saat library pembaca dimuat. PDF dan gambar scan belum didukung pada versi ini.</p>`);
+ setTimeout(()=>{
+  const fileInput=document.getElementById('afImportFile'),status=document.getElementById('afImportStatus'),preview=document.getElementById('afImportPreview'),commit=document.getElementById('afImportCommit');
+  let parsedItems=[];
+  document.getElementById('afImportCancel').onclick=closeModal;
+  const downloadText=(name,content,type='text/plain;charset=utf-8')=>{const blob=new Blob(['\\ufeff'+content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+  const templateBtn=document.getElementById('afDownloadTemplate');if(templateBtn)templateBtn.onclick=()=>downloadText(isQ?'Template_Bank_Soal_ALFAJAR.csv':'Template_Materi_ALFAJAR.txt',isQ?'Pertanyaan,A,B,C,D,Kunci,Pembahasan,Topik,Jenis\r\n"Berapakah hasil 5 + 3?",7,8,9,10,B,"5 + 3 = 8",Penjumlahan,Pilihan Ganda\r\n"Tuliskan nama ibu kota Indonesia.",,,,,Jakarta,"Contoh soal isian",Pengetahuan,Isian':'JUDUL MATERI: Bab 1 - Judul Materi\nMATA PELAJARAN: Matematika\nKELAS: 3\n\nTUJUAN PEMBELAJARAN\nTuliskan tujuan pembelajaran.\n\nMATERI\nTuliskan penjelasan materi di sini.\n\nCONTOH\nTuliskan contoh dan pembahasannya.\n\nAKTIVITAS\nTuliskan aktivitas belajar siswa.'); 
+  const wordFormat=document.getElementById('afWordFormat');if(wordFormat)wordFormat.onclick=()=>openModal('<div class="brand text-xl font-bold mb-2">FORMAT WORD UNTUK SOAL</div><p class="text-xs text-blue-100 mb-2">Satu soal dimulai dengan nomor. Pilihan jawaban dan kunci ditulis pada baris terpisah.</p><pre class="whitespace-pre-wrap rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">1. Berapakah hasil 5 + 3?\nA. 7\nB. 8\nC. 9\nD. 10\nKunci: B\nPembahasan: 5 + 3 = 8.\n\n2. Sebutkan salah satu pancaindra!\nKunci: Mata</pre><button onclick="teacherImportCenter(\'questions\')" class="w-full mt-3 bg-sky-500 rounded-xl p-3">KEMBALI KE IMPORT</button>');
+  const setCommit=(n)=>{commit.disabled=!n;commit.textContent=`IMPORT ${n} ITEM`;commit.className=n?'flex-1 bg-emerald-500 rounded-xl p-3 font-extrabold':'flex-1 bg-emerald-500/50 text-white/60 rounded-xl p-3 font-extrabold cursor-not-allowed';};
+  fileInput.onchange=async()=>{
+   parsedItems=[];preview.innerHTML='';setCommit(0);
+   const file=fileInput.files&&fileInput.files[0];if(!file){status.textContent='Belum ada file dipilih.';return;}
+   const ext=(file.name.split('.').pop()||'').toLowerCase();
+   const meta={subject:document.getElementById('afImportSubject').value,classLevel:Number(document.getElementById('afImportClass').value),chapter:document.getElementById('afImportChapter').value.trim()||file.name.replace(/\.[^.]+$/,'')};
+   status.textContent='Membaca '+file.name+' ...';
+   try{
+    if(isQ&&(ext==='xlsx'||ext==='xls'||ext==='csv')){
+     const XLSX=await loadAfImportLibrary('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js','XLSX');
+     const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+     parsedItems=rows.map((r,i)=>afQuestionFromRow(r,i,meta)).filter(Boolean);
+    }else if(ext==='docx'){
+     const mammoth=await loadAfImportLibrary('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js','mammoth');
+     const buf=await file.arrayBuffer(),result=await mammoth.extractRawText({arrayBuffer:buf}),plain=result.value||'';
+     if(isQ)parsedItems=afParseQuestionDocxText(plain,meta);
+     else parsedItems=[{title:meta.chapter,content:plain.trim(),subject:meta.subject,grade:'SD',classLevel:meta.classLevel,chapter:meta.chapter,sourceFile:file.name}];
+    }else if(ext==='txt'){
+     const plain=await file.text();
+     if(isQ)parsedItems=afParseQuestionDocxText(plain,meta);
+     else parsedItems=[{title:meta.chapter,content:plain.trim(),subject:meta.subject,grade:'SD',classLevel:meta.classLevel,chapter:meta.chapter,sourceFile:file.name}];
+    }else throw new Error('Format file belum didukung untuk pilihan ini.');
+    if(!parsedItems.length)throw new Error(isQ?'Tidak menemukan soal. Periksa judul kolom Excel atau format nomor soal di Word.':'Dokumen tidak memiliki teks yang dapat dibaca.');
+    if(isQ){
+     const invalid=parsedItems.filter(q=>!q.answer||(q.type==='mcq'&&q.options.length<2));
+     const valid=parsedItems.filter(q=>q.answer&&(q.type!=='mcq'||q.options.length>=2));
+     parsedItems=valid;
+     if(!parsedItems.length)throw new Error('Soal terbaca, tetapi belum ada soal dengan kunci jawaban dan pilihan yang lengkap.');
+     status.innerHTML=`<span class="text-emerald-300 font-bold">${parsedItems.length} soal siap diperiksa.</span> ${invalid.length?`<span class="text-amber-200">${invalid.length} soal dilewati karena kunci/pilihan belum lengkap.</span>`:''}`;
+     preview.innerHTML=`<div class="rounded-xl bg-white/10 p-3"><b class="text-sm">Pratinjau ${parsedItems.length} soal</b><div class="max-h-52 overflow-y-auto mt-2 space-y-2">${parsedItems.slice(0,12).map((q,i)=>`<div class="border-b border-white/10 pb-2"><div class="text-[10px] text-amber-200">${i+1}. ${safeText(q.subject)} · Kelas ${q.classLevel} · ${q.type==='mcq'?'Pilihan ganda':'Isian'}</div><div class="text-xs font-bold">${safeText(q.question)}</div><div class="text-[11px] text-blue-100">Kunci: ${safeText(q.answer)}</div></div>`).join('')}${parsedItems.length>12?`<p class="text-xs text-blue-200">dan ${parsedItems.length-12} soal lainnya...</p>`:''}</div></div>`;
+    }else{
+     status.innerHTML=`<span class="text-emerald-300 font-bold">Dokumen berhasil dibaca.</span> Periksa isi sebelum disimpan.`;
+     preview.innerHTML=`<div class="rounded-xl bg-white/10 p-3"><b class="text-sm">${safeText(parsedItems[0].title)}</b><p class="text-xs text-blue-100 whitespace-pre-wrap mt-2 max-h-48 overflow-y-auto">${safeText(parsedItems[0].content.slice(0,3500))}</p><div class="text-[10px] text-blue-200 mt-2">${parsedItems[0].content.length} karakter · Kelas ${meta.classLevel} · ${safeText(meta.subject)}</div></div>`;
+    }
+    setCommit(parsedItems.length);
+   }catch(err){status.innerHTML=`<span class="text-rose-300 font-bold">Gagal membaca file:</span> ${safeText(err.message||err)}`;parsedItems=[];setCommit(0);}
+  };
+  commit.onclick=()=>{
+   if(!parsedItems.length)return;
+   try{
+    if(isQ){
+     const existing=new Set(questionBank.map(q=>q.id));
+     const fresh=parsedItems.map((q,i)=>({...q,id:existing.has(q.id)?q.id+'_new_'+i:q.id,grade:'SD'}));
+     questionBank.push(...fresh);localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));
+     showToast(fresh.length+' soal berhasil diimpor.');teacherDashboard('questions');
+    }else{
+     teacherMaterials.push(...parsedItems);persistTeacherData();
+     showToast(parsedItems.length+' materi berhasil diimpor.');teacherDashboard('materials');
+    }
+   }catch(err){showToast('Gagal menyimpan. Penyimpanan browser mungkin penuh: '+err.message);}
+  };
+ },0);
+}
+
 function teacherDashboard(section='home'){
  const nav=`<div class="flex flex-wrap gap-2 mb-4">
  ${[['home','Ringkasan','chart-pie'],['classes','Kelas','users'],['questions','Bank Soal','database'],['materials','Materi','book-open'],['reports','Hasil Belajar','chart-column']].map(([id,label,ico])=>`<button class="teacherNav px-3 py-2 rounded-xl text-xs font-extrabold ${section===id?'bg-amber-400 text-slate-900':'bg-white/10 text-white'}" data-section="${id}"><i class="fa-solid fa-${ico} mr-1"></i>${label}</button>`).join('')}
@@ -3566,16 +3705,16 @@ function teacherDashboard(section='home'){
   const avg=quizResults.length?Math.round(quizResults.reduce((a,r)=>a+r.percent,0)/quizResults.length):0;
   content=`<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
    ${[['KELAS',teacherClasses.length,'fa-users'],['BANK SOAL',questionBank.length,'fa-database'],['MATERI',teacherMaterials.length,'fa-book-open'],['RATA-RATA NILAI',avg+'%','fa-chart-line']].map(([a,b,c])=>`<div class="bg-white/10 rounded-xl p-3"><i class="fa-solid ${c} text-amber-300"></i><div class="text-2xl font-black mt-1">${b}</div><div class="text-[10px] text-blue-100 font-extrabold">${a}</div></div>`).join('')}
-  </div><div class="bg-white/10 rounded-xl p-4"><b>Selamat datang di Mode Guru</b><p class="text-sm text-blue-100 mt-1">Kelola kelas, susun bank soal, tambahkan materi, dan pantau hasil belajar. Data versi ini tersimpan di browser/perangkat yang digunakan.</p></div>
+  </div><div class="bg-white/10 rounded-xl p-4"><b>Selamat datang di Mode Guru</b><p class="text-sm text-blue-100 mt-1">Kelola kelas, impor materi Word dan bank soal Excel/CSV, susun soal, dan pantau hasil belajar. Data Mode Guru versi ini tersimpan di browser/perangkat yang digunakan.</p></div>
   <div class="grid md:grid-cols-2 gap-2 mt-3"><button class="teacherShortcut bg-sky-500 rounded-xl p-3 font-extrabold" data-section="classes">+ Buat kelas</button><button class="teacherShortcut bg-emerald-500 rounded-xl p-3 font-extrabold" data-section="questions">+ Kelola soal</button><button id="teacherClassroomShortcut" class="bg-violet-500 rounded-xl p-3 font-extrabold md:col-span-2">Buka Kelas Virtual · Mode Guru</button></div>`;
  }else if(section==='classes'){
   content=`<div class="flex items-center justify-between mb-3"><b class="brand text-xl">Manajemen Kelas</b><button id="addClass" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold">+ BUAT KELAS</button></div>
   <div class="space-y-2">${teacherClasses.length?teacherClasses.map((c,i)=>`<div class="bg-white/10 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2"><div><b>${safeText(c.name)}</b><div class="text-xs text-blue-100">${safeText(c.grade)} · ${c.students.length} siswa · Kode <b class="text-amber-300">${safeText(c.code)}</b></div><div class="text-[11px] text-blue-200 mt-1">${c.students.map(safeText).join(', ')||'Belum ada siswa'}</div></div><div class="flex gap-2"><button class="editClass bg-sky-500 rounded-lg px-3 py-2 text-xs" data-i="${i}">Edit</button><button class="deleteClass bg-rose-500/80 rounded-lg px-3 py-2 text-xs" data-i="${i}">Hapus</button></div></div>`).join(''):'<p class="text-sm text-blue-100 bg-white/10 rounded-xl p-4">Belum ada kelas. Buat kelas pertama untuk memulai.</p>'}</div>`;
  }else if(section==='questions'){
-  content=`<div class="flex items-center justify-between mb-3"><b class="brand text-xl">Bank Soal (${questionBank.length})</b><div class="flex gap-2"><button id="addQuestion" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold">+ TAMBAH SOAL</button><button id="jsonQuestion" class="bg-sky-500 rounded-xl px-3 py-2 text-xs font-extrabold">JSON</button></div></div>
+  content=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><b class="brand text-xl">Bank Soal (${questionBank.length})</b><div class="flex flex-wrap gap-2"><button id="importQuestions" class="bg-violet-500 rounded-xl px-3 py-2 text-xs font-extrabold"><i class="fa-solid fa-file-import mr-1"></i>IMPORT FILE</button><button id="addQuestion" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold">+ TAMBAH SOAL</button><button id="jsonQuestion" class="bg-sky-500 rounded-xl px-3 py-2 text-xs font-extrabold">JSON</button></div></div>
   <div class="space-y-2 max-h-80 overflow-y-auto">${questionBank.map((q,i)=>`<div class="bg-white/10 rounded-xl p-3 flex justify-between gap-2"><div class="min-w-0"><div class="text-[10px] text-amber-200 font-extrabold">${safeText(q.subject)} · ${safeText(q.grade)} · ${safeText(q.type)}</div><div class="text-sm font-bold">${safeText(q.question)}</div><div class="text-xs text-blue-100">Kunci: ${safeText(q.answer)}</div></div><div class="flex flex-col gap-1 shrink-0"><button class="editQuestion bg-sky-500 rounded-lg px-2 py-1 text-xs" data-i="${i}">Edit</button><button class="deleteQuestion bg-rose-500/80 rounded-lg px-2 py-1 text-xs" data-i="${i}">Hapus</button></div></div>`).join('')}</div>`;
  }else if(section==='materials'){
-  content=`<div class="flex items-center justify-between mb-3"><b class="brand text-xl">Materi Pembelajaran</b><button id="addMaterial" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold">+ TAMBAH MATERI</button></div>
+  content=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><b class="brand text-xl">Materi Pembelajaran</b><div class="flex gap-2"><button id="importMaterials" class="bg-violet-500 rounded-xl px-3 py-2 text-xs font-extrabold"><i class="fa-solid fa-file-import mr-1"></i>IMPORT WORD</button><button id="addMaterial" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold">+ TAMBAH MATERI</button></div></div>
   <div class="space-y-2">${teacherMaterials.length?teacherMaterials.map((m,i)=>`<div class="bg-white/10 rounded-xl p-3 flex justify-between gap-2"><div><b>${safeText(m.title)}</b><div class="text-xs text-blue-100">${safeText(m.subject)} · ${safeText(m.grade)}</div><p class="text-xs text-blue-50 mt-1">${safeText(m.content).slice(0,180)}</p>${m.url?`<a class="text-xs text-cyan-200 underline" href="${safeText(m.url)}" target="_blank" rel="noopener">Buka tautan</a>`:''}</div><button class="deleteMaterial bg-rose-500/80 rounded-lg px-3 py-2 text-xs h-fit" data-i="${i}">Hapus</button></div>`).join(''):'<p class="text-sm text-blue-100 bg-white/10 rounded-xl p-4">Belum ada materi yang ditambahkan.</p>'}</div>`;
  }else{
   content=`<div class="flex items-center justify-between mb-3"><b class="brand text-xl">Rekap Hasil Belajar</b><button id="exportResults" class="bg-emerald-500 rounded-xl px-3 py-2 text-xs font-extrabold"><i class="fa-solid fa-file-csv mr-1"></i>EKSPOR CSV</button></div>
@@ -3590,6 +3729,8 @@ function teacherDashboard(section='home'){
   document.querySelectorAll('.editClass').forEach(b=>b.onclick=()=>classEditor(Number(b.dataset.i)));
   document.querySelectorAll('.deleteClass').forEach(b=>b.onclick=()=>{teacherClasses.splice(Number(b.dataset.i),1);persistTeacherData();teacherDashboard('classes');});
   const addQ=document.getElementById('addQuestion');if(addQ)addQ.onclick=()=>questionEditor();
+  const importQ=document.getElementById('importQuestions');if(importQ)importQ.onclick=()=>teacherImportCenter('questions');
+  const importM=document.getElementById('importMaterials');if(importM)importM.onclick=()=>teacherImportCenter('materials');
   const jsonQ=document.getElementById('jsonQuestion');if(jsonQ)jsonQ.onclick=teacherJsonEditor;
   document.querySelectorAll('.editQuestion').forEach(b=>b.onclick=()=>questionEditor(Number(b.dataset.i)));
   document.querySelectorAll('.deleteQuestion').forEach(b=>b.onclick=()=>{questionBank.splice(Number(b.dataset.i),1);localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));teacherDashboard('questions');});
@@ -3697,7 +3838,55 @@ const builtInLessons={
    ['Memilih operasi','Kata seperti “bertambah” atau “seluruhnya” sering menunjukkan penjumlahan. Kata “tersisa” atau “selisih” sering menunjukkan pengurangan. Tetap pahami cerita secara utuh.'],
    ['Memeriksa hasil','Masukkan jawaban ke kalimat matematika semula untuk memastikan kedua sisi sama.']
   ],examples:[['Lengkapi: 35 + □ = 50.','50 − 35 = 15, jadi kotaknya 15.'],['Lengkapi: 72 − □ = 40.','72 − 40 = 32, jadi kotaknya 32.']]}
+ ] ,
+
+ 'Bahasa Indonesia|SD':[
+  {chapter:'Bab 1: Ayo Main!',icon:'fa-puzzle-piece',color:'sky',goal:'Mengelompokkan benda berdasarkan ciri, memahami kalimat sederhana, serta menggunakan huruf kapital dan tanda baca dengan tepat.',sections:[
+   ['Mengamati dan mengelompokkan benda','Saat bermain, kita dapat menemukan banyak benda. Benda dapat dikelompokkan berdasarkan bentuk, warna, ukuran, kegunaan, atau bahan pembuatnya. Contohnya, bola dan kelereng sama-sama berbentuk bulat.'],
+   ['Mengenali ciri benda','Perhatikan ciri benda sebelum mengelompokkannya. Contoh: pensil dan penggaris digunakan untuk belajar, sedangkan bola dan layang-layang digunakan untuk bermain.'],
+   ['Menggunakan huruf kapital','Huruf kapital digunakan pada awal kalimat, nama orang, dan nama tempat. Contoh: “Siti bermain di halaman.” Nama Siti ditulis dengan huruf kapital.'],
+   ['Menggunakan tanda baca','Tanda titik (.) digunakan pada akhir kalimat berita. Tanda tanya (?) digunakan pada akhir kalimat pertanyaan. Tanda seru (!) dapat digunakan untuk seruan atau perintah.'],
+   ['Menulis kalimat dengan rapi','Tulislah kata dengan jarak atau spasi yang tepat agar mudah dibaca. Awali kalimat dengan huruf kapital dan akhiri dengan tanda baca yang sesuai.']
+  ],examples:[['Kelompokkan bola, kelereng, buku, dan pensil berdasarkan bentuknya.','Bola dan kelereng berbentuk bulat. Buku dan pensil memiliki bentuk yang berbeda.'],['Perbaiki kalimat: “andi bermain bola”','Andi bermain bola. Nama Andi diawali huruf kapital dan kalimat berita diakhiri tanda titik.']],activity:{title:'Detektif tanda baca',visual:'<div class="text-center text-4xl my-3">🧩 ✏️ 📚</div><p class="text-center text-sm text-blue-100">Pilih tanda baca yang tepat untuk melengkapi kalimat.</p>',question:'“Di mana kamu bermain___” Tanda baca yang tepat adalah ....',options:['Titik (.)','Tanya (?)','Seru (!)'],answer:'Tanya (?)',explain:'Kalimat tersebut menanyakan tempat, sehingga diakhiri tanda tanya.'}},
+  {chapter:'Bab 2: Kawan Seiring',icon:'fa-people-group',color:'emerald',goal:'Menyimak petunjuk, memahami pesan gambar, mengenali urutan cerita, dan menunjukkan sikap baik kepada teman.',sections:[
+   ['Menyimak dengan saksama','Menyimak berarti mendengarkan dengan penuh perhatian. Saat guru atau teman berbicara, dengarkan sampai selesai agar pesan dapat dipahami.'],
+   ['Mengikuti petunjuk','Petunjuk berisi langkah-langkah yang perlu dilakukan secara berurutan. Perhatikan kata seperti pertama, kemudian, setelah itu, dan terakhir.'],
+   ['Memahami pesan gambar','Gambar dapat menyampaikan pesan. Amati siapa yang ada pada gambar, apa yang sedang dilakukan, dan sikap apa yang dapat kita teladani.'],
+   ['Mengenal bagian cerita','Cerita sederhana memiliki bagian awal, tengah, dan akhir. Bagian awal mengenalkan tokoh atau keadaan, bagian tengah menceritakan peristiwa, dan bagian akhir menunjukkan penyelesaian.'],
+   ['Berteman dan bekerja sama','Teman yang baik saling menghargai, membantu, bergantian, dan bekerja sama. Gunakan kata-kata yang sopan ketika berbicara dengan teman.']
+  ],examples:[['Petunjuk: “Ambil buku, buka halaman 10, lalu bacalah.” Apa yang dilakukan setelah mengambil buku?','Membuka buku pada halaman 10. Petunjuk dilakukan sesuai urutan.'],['Gambar menunjukkan dua anak membantu merapikan kelas. Apa pesan gambar tersebut?','Kita sebaiknya bekerja sama menjaga kebersihan kelas.']],activity:{title:'Ikuti petunjuk berurutan',visual:'<div class="flex justify-center gap-3 text-4xl my-3"><span>📖</span><span>➡️</span><span>✍️</span><span>➡️</span><span>🎒</span></div><p class="text-center text-sm text-blue-100">Baca petunjuk dengan teliti, lalu tentukan langkah berikutnya.</p>',question:'Petunjuk: “Buka buku, tulis tanggal, kemudian kerjakan soal.” Setelah menulis tanggal, kita harus ....',options:['Menutup buku','Mengerjakan soal','Mengambil tas'],answer:'Mengerjakan soal',explain:'Kata “kemudian” menunjukkan langkah berikutnya, yaitu mengerjakan soal.'}},
+  {chapter:'Bab 3: Pengobar Semangat',icon:'fa-bullhorn',color:'amber',goal:'Berbicara santun, menyampaikan dan menanggapi pendapat, serta menemukan gagasan utama dalam paragraf sederhana.',sections:[
+   ['Berbicara dengan santun','Gunakan kata tolong, maaf, dan terima kasih sesuai keadaan. Sesuaikan cara berbicara dengan lawan bicara. Berbicaralah dengan jelas dan tidak membentak.'],
+   ['Menyampaikan pendapat','Pendapat adalah pikiran atau gagasan seseorang. Sampaikan pendapat dengan kalimat yang jelas, misalnya “Menurut saya, kita perlu menjaga kebersihan kelas.”'],
+   ['Menanggapi pendapat teman','Dengarkan pendapat teman sampai selesai. Jika setuju, sampaikan alasan dengan sopan. Jika berbeda pendapat, gunakan kalimat seperti “Saya menghargai pendapatmu, tetapi menurut saya ...”.'],
+   ['Menemukan gagasan utama','Gagasan utama adalah pokok pembahasan dalam paragraf. Bacalah paragraf dengan saksama, lalu tanyakan: hal apa yang paling banyak dibicarakan?'],
+   ['Memberi semangat','Kalimat penyemangat dapat membuat teman lebih percaya diri. Contohnya: “Kamu pasti bisa!”, “Teruslah berusaha!”, dan “Jangan menyerah!”.']
+  ],examples:[['Temanmu kesulitan membawa buku. Kalimat santun untuk menawarkan bantuan adalah ....','“Bolehkah aku membantu membawa bukumu?”'],['Bacalah: “Setiap pagi, Raka menyiram tanaman. Ia juga membersihkan rumput liar. Tanaman di halaman tumbuh subur.” Apa gagasan utamanya?','Raka merawat tanaman di halaman. Kalimat lainnya menjelaskan kegiatan perawatan tersebut.']],activity:{title:'Pilih kalimat penyemangat',visual:'<div class="text-center text-4xl my-3">🌟 🙌 🌈</div><p class="text-center text-sm text-blue-100">Temanmu sedang belajar membaca. Berikan dukungan yang baik.</p>',question:'Kalimat yang paling tepat untuk menyemangati teman adalah ....',options:['“Kamu tidak akan bisa!”','“Ayo terus berlatih, kamu pasti bisa!”','“Aku tidak mau mendengarkan.”'],answer:'Ayo terus berlatih, kamu pasti bisa!',explain:'Kalimat tersebut memberi dukungan dan semangat kepada teman.'}}
+ ],
+ 'IPAS|SD':[
+  {chapter:'Bab 1: Organ Tubuh Manusia dan Panca Indera',icon:'fa-heart-pulse',color:'rose',goal:'Mengenal beberapa organ tubuh, fungsi pancaindra, serta kebiasaan menjaga kesehatan tubuh.',sections:[
+   ['Tubuh memiliki banyak organ','Tubuh manusia tersusun atas bagian-bagian yang bekerja bersama. Setiap organ memiliki tugas. Contohnya, jantung membantu mengalirkan darah dan paru-paru membantu kita bernapas.'],
+   ['Lima pancaindra','Manusia memiliki lima indra: mata untuk melihat, telinga untuk mendengar, hidung untuk mencium bau, lidah untuk mengecap rasa, dan kulit untuk merasakan sentuhan, panas, serta dingin.'],
+   ['Organ tubuh dan fungsinya','Jantung memompa darah. Paru-paru membantu pertukaran udara saat bernapas. Lambung membantu mencerna makanan. Otak membantu mengatur berbagai kegiatan tubuh.'],
+   ['Cara menjaga kesehatan indra','Jaga mata dengan membaca di tempat bercahaya cukup. Jaga telinga dari suara terlalu keras. Jaga kebersihan hidung, lidah, dan kulit. Jangan memasukkan benda ke dalam telinga atau hidung.'],
+   ['Kebiasaan hidup sehat','Makan makanan bergizi, minum air yang cukup, berolahraga, tidur cukup, dan menjaga kebersihan tubuh membantu organ bekerja dengan baik.']
+  ],examples:[['Indra apa yang digunakan untuk mengetahui aroma bunga?','Hidung, karena hidung merupakan indra penciuman.'],['Sebutkan satu kebiasaan untuk menjaga kesehatan mata.','Membaca dengan pencahayaan yang cukup dan memberi jeda saat menggunakan layar.']],activity:{title:'Pasangkan indra dan fungsinya',visual:'<div class="flex justify-center flex-wrap gap-3 text-4xl my-3"><span>👁️</span><span>👂</span><span>👃</span><span>👅</span><span>✋</span></div><p class="text-center text-sm text-blue-100">Ingat kembali fungsi setiap pancaindra.</p>',question:'Bagian tubuh yang digunakan untuk merasakan panas dan dingin adalah ....',options:['Mata','Kulit','Lidah'],answer:'Kulit',explain:'Kulit merupakan indra peraba yang membantu merasakan sentuhan, panas, dan dingin.'}},
+  {chapter:'Bab 2: Siklus Hidup Makhluk Hidup',icon:'fa-seedling',color:'emerald',goal:'Menjelaskan tahapan pertumbuhan dan siklus hidup hewan serta tumbuhan melalui contoh di sekitar.',sections:[
+   ['Makhluk hidup tumbuh dan berkembang','Manusia, hewan, dan tumbuhan mengalami perubahan selama hidupnya. Perubahan tersebut disebut pertumbuhan dan perkembangan. Makhluk hidup membutuhkan makanan atau nutrisi, air, dan lingkungan yang sesuai.'],
+   ['Siklus hidup kupu-kupu','Kupu-kupu mengalami perubahan bentuk: telur, ulat (larva), kepompong (pupa), lalu kupu-kupu dewasa. Perubahan bentuk yang jelas ini disebut metamorfosis sempurna.'],
+   ['Siklus hidup hewan lain','Ayam berkembang dari telur, menetas menjadi anak ayam, lalu tumbuh menjadi ayam dewasa. Katak berkembang melalui tahap telur, berudu, katak muda, dan katak dewasa.'],
+   ['Siklus hidup tumbuhan','Tumbuhan dapat tumbuh dari biji. Biji berkecambah, muncul akar dan tunas, kemudian tumbuh menjadi tanaman muda dan tanaman dewasa. Tanaman dewasa dapat menghasilkan bunga dan biji.'],
+   ['Merawat makhluk hidup','Hewan dan tumbuhan membutuhkan perawatan sesuai kebutuhannya. Berikan makanan yang sesuai kepada hewan dan rawat tanaman dengan air, cahaya matahari, serta media tumbuh yang baik.']
+  ],examples:[['Tuliskan urutan siklus hidup kupu-kupu.','Telur → ulat → kepompong → kupu-kupu dewasa.'],['Apa yang dibutuhkan biji agar dapat tumbuh?','Biji membutuhkan air, udara, dan kondisi lingkungan yang sesuai.']],activity:{title:'Susun siklus hidup kupu-kupu',visual:'<div class="flex justify-center items-center flex-wrap gap-2 text-3xl my-3"><span>🥚</span><span>➡️</span><span>🐛</span><span>➡️</span><span>🫘</span><span>➡️</span><span>🦋</span></div><p class="text-center text-sm text-blue-100">Perhatikan perubahan bentuk kupu-kupu.</p>',question:'Tahap yang terjadi setelah ulat pada siklus hidup kupu-kupu adalah ....',options:['Telur','Kepompong','Kupu-kupu dewasa'],answer:'Kepompong',explain:'Setelah menjadi ulat (larva), kupu-kupu memasuki tahap kepompong (pupa).'}},
+  {chapter:'Bab 3: Interaksi Sosial',icon:'fa-people-arrows-left-right',color:'violet',goal:'Memahami interaksi sosial dan menunjukkan sikap kerja sama, tolong-menolong, serta menghargai perbedaan.',sections:[
+   ['Apa itu interaksi sosial?','Interaksi sosial adalah hubungan timbal balik antara seseorang dengan orang lain atau kelompok. Interaksi dapat terjadi melalui percakapan, kerja sama, dan kegiatan bersama.'],
+   ['Interaksi di rumah','Di rumah, anggota keluarga saling berbicara, membantu pekerjaan rumah, makan bersama, dan merawat anggota keluarga. Kegiatan tersebut merupakan contoh interaksi sosial.'],
+   ['Interaksi di sekolah','Di sekolah, siswa belajar bersama, berdiskusi, bermain, bergiliran menggunakan alat, dan bekerja sama membersihkan kelas. Interaksi yang baik membuat suasana belajar nyaman.'],
+   ['Kerja sama dan tolong-menolong','Kerja sama dilakukan untuk mencapai tujuan bersama. Tolong-menolong berarti membantu orang yang membutuhkan bantuan. Contohnya membantu teman merapikan buku atau bekerja bersama membersihkan kelas.'],
+   ['Menghargai perbedaan','Setiap orang dapat memiliki kesukaan dan pendapat yang berbeda. Dengarkan orang lain, gunakan kata-kata sopan, bergiliran, dan selesaikan perbedaan dengan musyawarah.']
+  ],examples:[['Sebutkan contoh interaksi sosial di sekolah.','Berdiskusi dengan teman, menyapa guru, bermain bersama, atau membersihkan kelas bersama.'],['Apa yang sebaiknya dilakukan ketika berbeda pendapat dengan teman?','Mendengarkan pendapat teman, menyampaikan pendapat dengan sopan, dan mencari kesepakatan.']],activity:{title:'Misi kerja sama',visual:'<div class="text-center text-4xl my-3">🤝 🧹 🏫</div><p class="text-center text-sm text-blue-100">Bayangkan kelas sedang bersiap untuk kegiatan bersama.</p>',question:'Kelas akan dibersihkan bersama. Sikap yang menunjukkan kerja sama adalah ....',options:['Membiarkan teman bekerja sendiri','Membantu sesuai tugas masing-masing','Mengganggu teman yang sedang menyapu'],answer:'Membantu sesuai tugas masing-masing',explain:'Kerja sama berarti ikut berperan dan saling membantu untuk mencapai tujuan bersama.'}}
  ]
+
 };
 function openMaterialHub(placeName=null){
  const grade=selectedGrade||'SD';
@@ -3716,11 +3905,16 @@ function openMaterialHub(placeName=null){
  <p class="text-sm text-blue-100 mb-3">${placeName?'Selamat datang di '+safeText(placeName)+'. ':''}Pelajari materi Sekolah Dasar sesuai kelas yang dipilih.</p>
  <div class="flex items-center justify-between rounded-xl bg-white/10 p-3 mb-3"><div><small class="text-blue-200">JENJANG AKTIF · SD</small><b class="block">${safeText(grade)}</b></div><span class="text-xs text-blue-200">Materi tersedia: ${available.length}</span></div>
  ${cards||'<div class="rounded-xl bg-white/10 p-4 text-sm text-blue-100">Belum ada materi untuk jenjang ini. Guru dapat menambahkan materi melalui Mode Guru.</div>'}
- <p class="text-[11px] text-blue-200">Materi bawaan saat ini tersedia untuk Matematika dan IPAS SD Kelas 3. Guru dapat menambahkan materi SD kelas 1–6 melalui Mode Guru.</p>`);
+ <p class="text-[11px] text-blue-200">Materi bawaan saat ini tersedia untuk Matematika, Bahasa Indonesia, dan IPAS SD Kelas 3. Guru dapat menambahkan materi SD kelas 1–6 melalui Mode Guru.</p>`);
  setTimeout(()=>document.querySelectorAll('.openBuiltLesson').forEach(b=>b.onclick=()=>openLessonDetail(b.dataset.subject,Number(b.dataset.index))),0);
 }
 
-function lessonVisualActivity(index){
+function lessonVisualActivity(subject,index){
+ const lesson=(builtInLessons[subject+'|'+selectedGrade]||[])[index];
+ if(lesson&&lesson.activity){
+  const a=lesson.activity;
+  return `<div class="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 p-3 my-4"><div class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i><b>${safeText(a.title)}</b></div>${a.visual||''}<div class="border-t border-white/10 pt-3"><p class="font-bold text-sm mb-2">${safeText(a.question)}</p><div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${a.options.map(v=>`<button class="lessonActivityOption rounded-xl bg-white/10 hover:bg-sky-500/30 border border-white/10 p-3 font-extrabold" data-value="${safeText(v)}">${safeText(v)}</button>`).join('')}</div><p id="lessonActivityFeedback" class="hidden text-sm mt-3 rounded-xl p-3"></p></div></div>`;
+ }
  const activities=[
   {title:'Jelajah nilai tempat',visual:`<div class="flex justify-center gap-2 my-3">${[['2','RATUSAN','200'],['4','PULUHAN','40'],['8','SATUAN','8']].map(([n,l,v])=>`<div class="rounded-xl bg-slate-900/70 border border-sky-300/30 p-3 text-center min-w-[76px]"><b class="block text-3xl text-amber-300">${n}</b><small class="block text-[10px] text-blue-100">${l}</small><b class="text-sm text-emerald-300">${v}</b></div>`).join('')}</div>`,question:'Pada bilangan 462, berapakah nilai angka 6?',options:['6','60','600'],answer:'60',explain:'Angka 6 berada di tempat puluhan, jadi nilainya 6 × 10 = 60.'},
   {title:'Mesin penjumlahan',visual:`<div class="flex items-center justify-center gap-2 my-4"><div class="rounded-xl bg-sky-500/20 p-3 text-center"><b class="text-2xl">125</b><small class="block text-xs">Mula-mula</small></div><i class="fa-solid fa-plus text-amber-300 text-xl"></i><div class="rounded-xl bg-emerald-500/20 p-3 text-center"><b class="text-2xl">30</b><small class="block text-xs">Ditambahkan</small></div><i class="fa-solid fa-arrow-right text-amber-300"></i><div class="rounded-xl bg-violet-500/20 p-3 text-center"><b class="text-2xl">?</b><small class="block text-xs">Jumlah</small></div></div>`,question:'Berapakah hasil 125 + 30?',options:['145','155','165'],answer:'155',explain:'125 + 30 = 125 + 20 + 10 = 155.'},
@@ -3728,18 +3922,18 @@ function lessonVisualActivity(index){
   {title:'Lengkapi kalimat matematika',visual:`<div class="flex items-center justify-center gap-3 my-4"><div class="rounded-xl bg-sky-500/20 p-4 text-2xl font-extrabold">18</div><span class="text-2xl">+</span><div class="rounded-xl bg-amber-400/20 border-2 border-dashed border-amber-300 p-4 text-2xl font-extrabold text-amber-200">?</div><span class="text-2xl">=</span><div class="rounded-xl bg-emerald-500/20 p-4 text-2xl font-extrabold">25</div></div>`,question:'Bilangan berapakah yang tepat untuk mengisi kotak?',options:['5','7','8'],answer:'7',explain:'25 − 18 = 7. Jadi, 18 + 7 = 25.'}
  ];
  const a=activities[index]||activities[0];
- return `<div class="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 p-3 my-4"><div class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i><b>${a.title}</b></div>${a.visual}<div class="border-t border-white/10 pt-3"><p class="font-bold text-sm mb-2">${a.question}</p><div class="grid grid-cols-3 gap-2">${a.options.map((v,i)=>`<button class="lessonActivityOption rounded-xl bg-white/10 hover:bg-sky-500/30 border border-white/10 p-3 font-extrabold" data-value="${v}">${v}</button>`).join('')}</div><p id="lessonActivityFeedback" class="hidden text-sm mt-3 rounded-xl p-3"></p></div></div>`;
+ return `<div class="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 p-3 my-4"><div class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i><b>${a.title}</b></div>${a.visual}<div class="border-t border-white/10 pt-3"><p class="font-bold text-sm mb-2">${a.question}</p><div class="grid grid-cols-3 gap-2">${a.options.map(v=>`<button class="lessonActivityOption rounded-xl bg-white/10 hover:bg-sky-500/30 border border-white/10 p-3 font-extrabold" data-value="${v}">${v}</button>`).join('')}</div><p id="lessonActivityFeedback" class="hidden text-sm mt-3 rounded-xl p-3"></p></div></div>`;
 }
 function openLessonDetail(subject,index){
  const lesson=(builtInLessons[subject+'|'+selectedGrade]||[])[index];if(!lesson)return;
  const body=lesson.sections.map((s,i)=>`<section class="rounded-xl bg-white/10 p-3 mb-2"><div class="flex gap-2 items-center mb-1"><span class="text-amber-300 font-extrabold">${i+1}.</span><b>${safeText(s[0])}</b></div><p class="text-sm text-blue-50 leading-relaxed">${safeText(s[1])}</p></section>`).join('');
  const examples=lesson.examples.map((e,i)=>`<div class="rounded-xl bg-sky-500/15 p-3 mb-2"><b class="text-sm">Contoh ${i+1}</b><p class="text-sm mt-1">${safeText(e[0])}</p><button class="showExampleAnswer text-xs text-cyan-200 underline mt-2" data-i="${i}">Lihat pembahasan</button><p class="exampleAnswer hidden text-sm text-emerald-200 mt-2">${safeText(e[1])}</p></div>`).join('');
- openModal(`<button id="backMaterialHub" class="text-xs text-cyan-200 mb-3"><i class="fa-solid fa-arrow-left mr-1"></i>Kembali ke Ruang Materi</button><div class="brand text-xl font-bold mb-1">${safeText(lesson.chapter)}</div><p class="text-sm text-blue-100 mb-3"><b>Tujuan belajar:</b> ${safeText(lesson.goal)}</p><div class="bar mb-3"><i style="width:100%"></i></div><h3 class="font-extrabold mb-2">PELAJARI MATERI</h3>${body}<h3 class="font-extrabold mt-4 mb-2">VISUALISASI DAN AKTIVITAS</h3>${lessonVisualActivity(index)}<h3 class="font-extrabold mt-4 mb-2">CONTOH DAN PEMBAHASAN</h3>${examples}<button id="lessonPractice" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold"><i class="fa-solid fa-gamepad mr-2"></i>LATIHAN BAB INI</button>`);
+ openModal(`<button id="backMaterialHub" class="text-xs text-cyan-200 mb-3"><i class="fa-solid fa-arrow-left mr-1"></i>Kembali ke Ruang Materi</button><div class="brand text-xl font-bold mb-1">${safeText(lesson.chapter)}</div><p class="text-sm text-blue-100 mb-3"><b>Tujuan belajar:</b> ${safeText(lesson.goal)}</p><div class="bar mb-3"><i style="width:100%"></i></div><h3 class="font-extrabold mb-2">PELAJARI MATERI</h3>${body}<h3 class="font-extrabold mt-4 mb-2">VISUALISASI DAN AKTIVITAS</h3>${lessonVisualActivity(subject,index)}<h3 class="font-extrabold mt-4 mb-2">CONTOH DAN PEMBAHASAN</h3>${examples}<button id="lessonPractice" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold"><i class="fa-solid fa-gamepad mr-2"></i>LATIHAN BAB INI</button>`);
  setTimeout(()=>{
   const back=document.getElementById('backMaterialHub');if(back)back.onclick=()=>openMaterialHub();
   document.querySelectorAll('.showExampleAnswer').forEach(b=>b.onclick=()=>document.querySelectorAll('.exampleAnswer')[Number(b.dataset.i)].classList.toggle('hidden'));
   document.querySelectorAll('.lessonActivityOption').forEach(b=>b.onclick=()=>{
-   const a=[{answer:'60',explain:'Angka 6 berada di tempat puluhan, jadi nilainya 60.'},{answer:'155',explain:'125 + 30 = 155.'},{answer:'12',explain:'4 kelompok × 3 apel = 12 apel.'},{answer:'7',explain:'25 − 18 = 7.'}][index]||{answer:'60',explain:'Perhatikan kembali contoh pada materi.'};
+   const a=lesson.activity?{answer:lesson.activity.answer,explain:lesson.activity.explain}:[{answer:'60',explain:'Angka 6 berada di tempat puluhan, jadi nilainya 60.'},{answer:'155',explain:'125 + 30 = 155.'},{answer:'12',explain:'4 kelompok × 3 apel = 12 apel.'},{answer:'7',explain:'25 − 18 = 7.'}][index]||{answer:'60',explain:'Perhatikan kembali contoh pada materi.'};
    const good=b.dataset.value===a.answer,fb=document.getElementById('lessonActivityFeedback');
    fb.classList.remove('hidden');fb.className='text-sm mt-3 rounded-xl p-3 '+(good?'bg-emerald-500/20 text-emerald-100':'bg-amber-500/20 text-amber-100');
    fb.textContent=(good?'Hebat! Jawabanmu benar. ':'Belum tepat. Yuk coba pahami lagi. ')+a.explain;
