@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>AL FAJAR EDUGAME — Virtual Learning Universe</title><meta name="description" content="AL FAJAR UNIVERSE — dunia belajar virtual 3D bergaya Roblox modern.">
+<title>AL FAJAR UNIVERSE v19.1 — Game Edukasi 3D Khusus SD</title><meta name="description" content="AL FAJAR UNIVERSE — dunia belajar virtual 3D khusus siswa Sekolah Dasar kelas 1 sampai 6.">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -341,7 +341,7 @@ window.__afDiagReady=true;
   <main class="welcome-hero">
    <div class="welcome-kicker">
     <span class="welcome-pill">🎮 GAME 3D EDUKASI</span>
-    <span class="welcome-pill">📚 SD • SMP • SMA</span>
+    <span class="welcome-pill">🎒 KHUSUS SEKOLAH DASAR (SD)</span>
     <span class="welcome-pill">📱 HP & 💻 LAPTOP</span>
    </div>
    <h1 class="welcome-title">AL FAJAR <span>UNIVERSE</span></h1>
@@ -352,18 +352,19 @@ window.__afDiagReady=true;
     <div class="text-sm sm:text-base font-extrabold mt-1">Eksplorasi kota • Mini-game • Misi harian • Kompetisi kelas</div>
    </div>
    <div class="mt-4 max-w-[650px] rounded-2xl border border-white/25 bg-slate-950/45 p-4 backdrop-blur-md">
-    <div class="font-black text-sm mb-2">🌍 PILIH JENJANG DUNIA BELAJAR</div>
-    <div class="grid grid-cols-3 gap-2">
-     <button class="gradeWorldBtn rounded-xl p-3 font-black text-sm bg-white/15 border border-white/20" data-grade="SD">🎒<br>SD</button>
-     <button class="gradeWorldBtn rounded-xl p-3 font-black text-sm bg-white/15 border border-white/20" data-grade="SMP">📘<br>SMP</button>
-     <button class="gradeWorldBtn rounded-xl p-3 font-black text-sm bg-white/15 border border-white/20" data-grade="SMA/SMK">🎓<br>SMA/SMK</button>
-    </div>
+    <div class="font-black text-sm mb-2">🎒 DUNIA BELAJAR SEKOLAH DASAR</div>
+    <div class="rounded-xl p-3 font-black text-sm bg-emerald-500/25 border border-emerald-300/40 text-center">🎒 KHUSUS SD · KELAS 1–6</div>
     <div id="selectedWorldLabel" class="text-xs font-extrabold text-emerald-200 mt-2">Dunia terpilih: SD · Kelas 3</div>
     <div class="mt-3">
      <label for="selectedClassInput" class="block text-xs font-extrabold text-blue-100 mb-1">PILIH KELAS</label>
      <select id="selectedClassInput" class="w-full rounded-xl bg-slate-800/95 text-white border border-white/20 p-3 font-bold">
-      <option value="3">Kelas 3</option>
-     </select>
+      <option value="1">Kelas 1</option>
+      <option value="2">Kelas 2</option>
+      <option value="3" selected>Kelas 3</option>
+      <option value="4">Kelas 4</option>
+      <option value="5">Kelas 5</option>
+      <option value="6">Kelas 6</option>
+      </select>
      <p id="classAvailabilityNote" class="text-[11px] text-blue-100 mt-2">Bank soal tersedia akan disesuaikan dengan kelas pilihanmu.</p>
     </div>
    </div>
@@ -376,7 +377,7 @@ window.__afDiagReady=true;
    </div>
   </main>
   <div class="welcome-pill self-start mt-5"><i class="fa-solid fa-cubes text-amber-300 mr-2"></i> KOTA 3D • MISI • MINI-GAME • KOMPETISI</div>
-  <footer class="welcome-footer">AL FAJAR UNIVERSE · VIRTUAL LEARNING WORLD <span class="float-right">BUILD • EXPLORE • LEARN</span></footer>
+  <footer class="welcome-footer">AL FAJAR UNIVERSE · DUNIA BELAJAR 3D KHUSUS SD <span class="float-right">BUILD • EXPLORE • LEARN</span></footer>
  </div>
 </div>
 
@@ -521,12 +522,10 @@ window.__afDiagReady=true;
 <script>let toastTimer;
 // Grade pilihan harus tersedia sebelum template learningHub dirender.
 let selectedGrade='SD',selectedClass=3;
-try { selectedGrade=localStorage.getItem('alfajar_selected_grade')||'SD'; selectedClass=Number(localStorage.getItem('alfajar_selected_class')||3); } catch(e) {}
-if(!['SD','SMP','SMA/SMK'].includes(selectedGrade))selectedGrade='SD';
-if(!Number.isInteger(selectedClass)||selectedClass<1||selectedClass>12)selectedClass=3;
-if(selectedGrade==='SD')selectedClass=Math.min(6,Math.max(1,selectedClass));
-else if(selectedGrade==='SMP')selectedClass=Math.min(9,Math.max(7,selectedClass));
-else selectedClass=Math.min(12,Math.max(10,selectedClass));
+try { selectedClass=Number(localStorage.getItem('alfajar_selected_class')||3); } catch(e) {}
+selectedGrade='SD';
+if(!Number.isInteger(selectedClass)||selectedClass<1||selectedClass>6)selectedClass=3;
+try{localStorage.setItem('alfajar_selected_grade','SD');localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
 
 
 if (!window.THREE) {
@@ -1897,6 +1896,13 @@ const femaleHairL=box(femaleHair,.24,1.18,.34,femaleHairMat,-.45,-.38,.27);
 const femaleHairR=box(femaleHair,.24,1.18,.34,femaleHairMat,.45,-.38,.27);
 const femaleFringe=box(femaleHair,.78,.22,.24,femaleHairMat,0,.34,.43);
 const femaleHairClip=box(femaleHair,.16,.1,.08,mat(0xf2c66d),.31,.25,.47);
+// Distinct player hair silhouettes (v19.0): extra voxel meshes make each preset visibly different.
+const maleFringe=box(head,.72,.2,.24,mat(0x3c2d28),0,.31,.43);
+const maleSideSweep=box(head,.46,.13,.24,mat(0x3c2d28),.16,.39,.39);
+const maleBun=box(head,.34,.34,.34,mat(0x3c2d28),0,.43,-.43);
+const femaleBun=box(femaleHair,.42,.38,.38,femaleHairMat,0,.48,-.38);
+const femaleSideFringe=box(femaleHair,.42,.16,.25,femaleHairMat,-.22,.34,.42);
+
 sphere(head,.09,skinMat,-.45,-.05,.02,8);sphere(head,.09,skinMat,.45,-.05,.02,8);
 
 box(head,.16,.12,.04,M.dark,-.2,.03,.405,{cast:false});box(head,.16,.12,.04,M.dark,.2,.03,.405,{cast:false});
@@ -1993,12 +1999,17 @@ for(const side of [-1,1]){
  box(shoeLeg,.34,.09,.045,mat(0x91c9e4),0,-.88,.485,{cast:false});
 }
 cap.visible=false;glasses.visible=false;backpack.visible=true;
-const avatarState={gender:'Laki-laki',skin:0xd99b72,hair:0x3c2d28,outfit:0x347fca,wear:'Tas'};
+const avatarState={gender:'Laki-laki',skin:0xd99b72,hair:0x3c2d28,outfit:0x347fca,wear:'Tas',hairStyle:'Klasik',petKind:'Kucing'};
+// Backward-compatible defaults for characters saved by older versions.
+avatarState.hairStyle=avatarState.hairStyle||'Klasik';avatarState.petKind=avatarState.petKind||'Kucing';
 try{Object.assign(avatarState,JSON.parse(localStorage.getItem('alfajar_avatar_v21')||'{}'));}catch(e){}
 const shopCatalog=[
  {id:'outfit_gold',name:'Jaket Penjelajah',type:'outfit',value:0xe0a52b,price:35,icon:'🧥',desc:'Jaket petualang warna emas'},
  {id:'outfit_mint',name:'Seragam Mint',type:'outfit',value:0x42b89a,price:25,icon:'👕',desc:'Seragam hijau mint'},
  {id:'outfit_violet',name:'Jubah Ilmuwan',type:'outfit',value:0x7956b5,price:45,icon:'🥼',desc:'Pakaian ilmuwan ungu'},
+ {id:'outfit_school',name:'Seragam Sekolah',type:'outfit',value:0x2d78b8,price:30,icon:'🎓',desc:'Seragam rapi untuk kegiatan belajar'},
+ {id:'outfit_sport',name:'Seragam Olahraga',type:'outfit',value:0x35a6a0,price:35,icon:'🏃',desc:'Pakaian olahraga warna teal'},
+ {id:'outfit_batik',name:'Batik Nusantara',type:'outfit',value:0x9a593c,price:40,icon:'👔',desc:'Motif warna hangat untuk acara sekolah'},
  {id:'wear_cap',name:'Topi Petualang',type:'wear',value:'Topi',price:20,icon:'🧢',desc:'Aksesori topi karakter'},
  {id:'wear_glasses',name:'Kacamata Pintar',type:'wear',value:'Kacamata',price:30,icon:'🤓',desc:'Aksesori kacamata'},
  {id:'wear_bag',name:'Tas Eksplorer',type:'wear',value:'Tas',price:25,icon:'🎒',desc:'Tas sekolah untuk petualang'}
@@ -3284,19 +3295,15 @@ document.getElementById('modalClose').onclick=closeModal;
 const defaultQuestionBank=[
  {id:'m1',subject:'Matematika',grade:'SD',type:'mcq',question:'Berapakah hasil dari 8 × 7?',options:['54','56','64','48'],answer:'56',explanation:'8 × 7 = 56.'},
  {id:'m2',subject:'Matematika',grade:'SD',type:'short',question:'Hasil dari 125 + 75 adalah ...',answer:'200',explanation:'125 + 75 = 200.'},
- {id:'m3',subject:'Matematika',grade:'SMP',type:'mcq',question:'Jika x + 9 = 15, nilai x adalah ...',options:['4','5','6','7'],answer:'6',explanation:'Kurangi kedua ruas dengan 9, sehingga x = 15 − 9 = 6.'},
- {id:'m4',subject:'Matematika',grade:'SMP',type:'tf',question:'Bilangan prima terkecil adalah 2.',options:['Benar','Salah'],answer:'Benar',explanation:'2 adalah bilangan prima terkecil dan satu-satunya bilangan prima genap.'},
  {id:'i1',subject:'IPA',grade:'SD',type:'mcq',question:'Bagian tumbuhan yang menyerap air dari tanah adalah ...',options:['Daun','Bunga','Akar','Buah'],answer:'Akar',explanation:'Akar menyerap air dan mineral dari tanah.'},
- {id:'i2',subject:'IPA',grade:'SMP',type:'mcq',question:'Planet yang dikenal sebagai Planet Merah adalah ...',options:['Venus','Mars','Jupiter','Saturnus'],answer:'Mars',explanation:'Mars tampak kemerahan karena mineral besi oksida pada permukaannya.'},
- {id:'i3',subject:'IPA',grade:'SMP',type:'tf',question:'Fotosintesis membutuhkan cahaya matahari.',options:['Benar','Salah'],answer:'Benar',explanation:'Cahaya menjadi sumber energi dalam proses fotosintesis.'},
  {id:'b1',subject:'Bahasa Indonesia',grade:'SD',type:'mcq',question:'Kalimat yang menggunakan tanda tanya dengan tepat adalah ...',options:['Siapa namamu?','Saya pergi ke sekolah?','Wah, indah sekali?','Tolong tutup pintu?'],answer:'Siapa namamu?',explanation:'Tanda tanya digunakan pada akhir kalimat tanya.'},
- {id:'b2',subject:'Bahasa Indonesia',grade:'SMP',type:'short',question:'Gagasan utama dalam sebuah paragraf disebut ...',answer:'ide pokok',explanation:'Gagasan utama atau ide pokok merupakan inti pembahasan paragraf.'},
  {id:'e1',subject:'Bahasa Inggris',grade:'SD',type:'mcq',question:'What is the meaning of “apple”?',options:['Apel','Jeruk','Pisang','Mangga'],answer:'Apel',explanation:'Apple berarti apel.'},
- {id:'e2',subject:'Bahasa Inggris',grade:'SMP',type:'tf',question:'“She is reading” uses the present continuous tense.',options:['True','False'],answer:'True',explanation:'Pola present continuous adalah subject + am/is/are + verb-ing.'},
  {id:'p1',subject:'Pendidikan Pancasila',grade:'SD',type:'mcq',question:'Lambang sila ketiga Pancasila adalah ...',options:['Bintang','Rantai','Pohon beringin','Kepala banteng'],answer:'Pohon beringin',explanation:'Pohon beringin melambangkan sila ketiga: Persatuan Indonesia.'}
 ];
 let questionBank=defaultQuestionBank.slice();
-try{const savedBank=localStorage.getItem('alfajar_question_bank');if(savedBank){const parsed=JSON.parse(savedBank);if(Array.isArray(parsed)&&parsed.length)questionBank=parsed;}}catch(e){}
+try{const savedBank=localStorage.getItem('alfajar_question_bank');if(savedBank){const parsed=JSON.parse(savedBank);if(Array.isArray(parsed)&&parsed.length)questionBank=parsed.filter(q=>!q.grade||q.grade==='SD').map(q=>({...q,grade:'SD'}));}}catch(e){}
+questionBank=questionBank.filter(q=>!q.grade||q.grade==='SD').map(q=>({...q,grade:'SD'}));
+try{localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));}catch(e){}
 let quizState=null,quizTimer=null;
 // Bank soal resmi SD Kelas 3 — Matematika Bab 1.
 // Seed digabung berdasarkan ID agar tidak menimpa soal guru yang sudah tersimpan.
@@ -3351,6 +3358,8 @@ function awardAchievement(id,title,description,icon){
 
 let studentProfile={name:'',grade:'SD',classCode:'',className:''};
 try{studentProfile={...studentProfile,...JSON.parse(localStorage.getItem('alfajar_student_profile')||'{}')};}catch(e){}
+studentProfile.grade='SD';
+if(!Number.isInteger(Number(studentProfile.classLevel))||Number(studentProfile.classLevel)<1||Number(studentProfile.classLevel)>6)studentProfile.classLevel=selectedClass;
 function saveStudentProfile(){try{localStorage.setItem('alfajar_student_profile',JSON.stringify(studentProfile));}catch(e){}}
 
 // MULTIPLAYER LOKAL: sinkronisasi antartab/browser context pada origin yang sama.
@@ -3443,13 +3452,23 @@ function syncWorld(){
 try{teacherClasses=JSON.parse(localStorage.getItem('alfajar_classes')||'[]');}catch(e){}
 try{teacherMaterials=JSON.parse(localStorage.getItem('alfajar_materials')||'[]');}catch(e){}
 try{quizResults=JSON.parse(localStorage.getItem('alfajar_quiz_results')||'[]');}catch(e){}
+teacherClasses=teacherClasses.map(c=>({...c,grade:'SD'}));
+teacherMaterials=teacherMaterials.filter(m=>!m.grade||m.grade==='SD').map(m=>({...m,grade:'SD'}));
+quizResults=quizResults.filter(r=>!r.grade||r.grade==='SD').map(r=>({...r,grade:'SD'}));
+try{teacherClasses=teacherClasses.map(c=>({...c,grade:'SD'}));
+  localStorage.setItem('alfajar_classes',JSON.stringify(teacherClasses));teacherMaterials=teacherMaterials.map(m=>({...m,grade:'SD'}));
+  localStorage.setItem('alfajar_materials',JSON.stringify(teacherMaterials));localStorage.setItem('alfajar_quiz_results',JSON.stringify(quizResults));}catch(e){}
 
 let classroomState={lessonTitle:'Selamat datang di Kelas Virtual',subject:'Umum',grade:'SD',announcement:'Belajar dengan semangat dan saling menghargai.',lessonText:'Guru dapat menerbitkan materi dan tugas dari menu kelas virtual.',assignmentTitle:'Tugas perkenalan',assignmentText:'Tuliskan satu hal baru yang ingin kamu pelajari.',submissions:[],attendance:[]};
 try{classroomState={...classroomState,...JSON.parse(localStorage.getItem('alfajar_classroom')||'{}')};}catch(e){}
+classroomState.grade='SD';
+try{localStorage.setItem('alfajar_student_profile',JSON.stringify(studentProfile));localStorage.setItem('alfajar_classroom',JSON.stringify(classroomState));}catch(e){}
 function saveClassroomState(){try{localStorage.setItem('alfajar_classroom',JSON.stringify(classroomState));}catch(e){showToast('Penyimpanan kelas tidak tersedia.');}}
 function persistTeacherData(){
  try{
+  teacherClasses=teacherClasses.map(c=>({...c,grade:'SD'}));
   localStorage.setItem('alfajar_classes',JSON.stringify(teacherClasses));
+  teacherMaterials=teacherMaterials.map(m=>({...m,grade:'SD'}));
   localStorage.setItem('alfajar_materials',JSON.stringify(teacherMaterials));
   localStorage.setItem('alfajar_quiz_results',JSON.stringify(quizResults));
  }catch(e){showToast('Penyimpanan lokal penuh atau tidak tersedia.');}
@@ -3494,10 +3513,10 @@ function tutorPanel(){
 }
 function learningHub(){
  const subjects=[...new Set(questionBank.map(q=>q.subject))].sort();
- openModal(`<div class="brand text-2xl font-bold mb-1">PUSAT BELAJAR</div><p class="text-blue-100 text-sm mb-4">Pilih mata pelajaran dan tingkat belajar untuk memulai kuis.</p>
+ openModal(`<div class="brand text-2xl font-bold mb-1">PUSAT BELAJAR</div><p class="text-blue-100 text-sm mb-4">Pilih mata pelajaran dan materi SD untuk memulai kuis.</p>
  <div class="grid grid-cols-2 gap-3 mb-3">
   <label class="text-xs font-extrabold text-blue-100">MATA PELAJARAN<select id="quizSubject" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${subjects.map(x=>`<option>${safeText(x)}</option>`).join('')}</select></label>
-  <label class="text-xs font-extrabold text-blue-100">JENJANG<select id="quizGrade" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option ${selectedGrade==='SD'?'selected':''}>SD</option><option ${selectedGrade==='SMP'?'selected':''}>SMP</option><option ${selectedGrade==='SMA/SMK'?'selected':''}>SMA/SMK</option></select></label>
+  <div class="text-xs font-extrabold text-emerald-200 rounded-xl bg-emerald-500/15 p-3">🎒 JENJANG PEMBELAJARAN: SD · KELAS 1–6</div><input id="quizGrade" type="hidden" value="SD">
   <label class="text-xs font-extrabold text-blue-100 col-span-2">BAB / MATERI<select id="quizChapter" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="">Semua bab</option>${[...new Set(questionBank.filter(q=>q.subject===subjects[0]&&q.grade==='SD'&&q.chapter).map(q=>q.chapter))].map(c=>`<option value="${safeText(c)}">${safeText(c)}</option>`).join('')}</select></label>
   <label class="text-xs font-extrabold text-blue-100 col-span-2">TINGKAT KESULITAN<select id="quizDifficulty" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="Semua">Semua tingkat</option><option>Dasar</option><option>Menengah</option><option>Lanjutan</option></select></label>
  </div>
@@ -3563,7 +3582,7 @@ function teacherDashboard(section='home'){
   <div class="grid grid-cols-3 gap-2 mb-3"><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${quizResults.length}</b><div class="text-[10px] text-blue-100">PENGERJAAN</div></div><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${quizResults.length?Math.round(quizResults.reduce((a,r)=>a+r.percent,0)/quizResults.length):0}%</b><div class="text-[10px] text-blue-100">RATA-RATA</div></div><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${quizResults.filter(r=>r.percent>=75).length}</b><div class="text-[10px] text-blue-100">NILAI ≥75</div></div></div>
   <div class="space-y-2 max-h-72 overflow-y-auto">${quizResults.length?quizResults.slice().reverse().map(r=>`<div class="bg-white/10 rounded-xl p-3 flex justify-between gap-2"><div><b>${safeText(r.subject)}</b><div class="text-xs text-blue-100">${safeText(r.grade)} · ${safeText(r.date)}</div></div><div class="text-right"><b class="text-xl text-amber-300">${r.percent}%</b><div class="text-[10px] text-blue-100">${r.correct}/${r.total} benar</div></div></div>`).join(''):'<p class="text-sm text-blue-100 bg-white/10 rounded-xl p-4">Belum ada hasil kuis.</p>'}</div>`;
  }
- openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-chalkboard-user text-amber-300 mr-2"></i>MODE GURU</div><p class="text-xs text-blue-100 mb-4">AL FAJAR EDUADMIN · Penyimpanan lokal perangkat</p>${nav}${content}`);
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-chalkboard-user text-amber-300 mr-2"></i>MODE GURU</div><p class="text-xs text-blue-100 mb-4">AL FAJAR EDUADMIN SD · Kelas 1–6 · Penyimpanan lokal perangkat</p>${nav}${content}`);
  setTimeout(()=>{
   document.querySelectorAll('.teacherNav,.teacherShortcut').forEach(b=>b.onclick=()=>teacherDashboard(b.dataset.section));
   const teacherRoom=document.getElementById('teacherClassroomShortcut');if(teacherRoom)teacherRoom.onclick=()=>classroomPanel('teacher');
@@ -3582,15 +3601,15 @@ function teacherDashboard(section='home'){
 function classEditor(index=null){
  const old=index===null?{name:'',grade:'SD',students:[],code:''}:teacherClasses[index];
  openModal(`<div class="brand text-2xl font-bold mb-3">${index===null?'Buat Kelas':'Edit Kelas'}</div><div class="space-y-3">
- <label class="block text-xs text-blue-100">Nama kelas<input id="className" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(old.name)}" placeholder="Contoh: VII A"></label>
- <label class="block text-xs text-blue-100">Jenjang<select id="classGrade" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${['SD','SMP','SMA/SMK'].map(g=>`<option ${old.grade===g?'selected':''}>${g}</option>`).join('')}</select></label>
+ <label class="block text-xs text-blue-100">Nama kelas<input id="className" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(old.name)}" placeholder="Contoh: Kelas 3A"></label>
+ <div class="rounded-xl bg-emerald-500/15 border border-emerald-300/20 p-3 text-xs text-emerald-100">Jenjang: Sekolah Dasar (SD)</div>
  <label class="block text-xs text-blue-100">Daftar nama siswa (pisahkan dengan koma)<textarea id="classStudents" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" rows="3">${safeText(old.students.join(', '))}</textarea></label>
  <button id="saveClass" class="w-full bg-emerald-500 rounded-xl p-3 font-extrabold">SIMPAN KELAS</button></div>`);
  setTimeout(()=>document.getElementById('saveClass').onclick=()=>{
   const name=document.getElementById('className').value.trim();if(!name){showToast('Nama kelas wajib diisi.');return;}
   const students=document.getElementById('classStudents').value.split(',').map(x=>x.trim()).filter(Boolean);
   const code=old.code||('AF'+Math.random().toString(36).slice(2,7).toUpperCase());
-  const item={name,grade:document.getElementById('classGrade').value,students,code};
+  const item={name,grade:'SD',students,code};
   if(index===null)teacherClasses.push(item);else teacherClasses[index]=item;
   persistTeacherData();teacherDashboard('classes');
  },0);
@@ -3599,7 +3618,7 @@ function questionEditor(index=null){
  const old=index===null?{id:'q'+Date.now(),subject:'Matematika',grade:'SD',type:'mcq',topic:'Konsep dasar',difficulty:'Dasar',question:'',options:['','','',''],answer:'',explanation:''}:{topic:'Konsep dasar',difficulty:'Dasar',...questionBank[index]};
  openModal(`<div class="brand text-2xl font-bold mb-3">${index===null?'Tambah Soal':'Edit Soal'}</div><div class="grid grid-cols-2 gap-2 text-xs">
  <label class="text-blue-100">Mata pelajaran<input id="qSubject" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white" value="${safeText(old.subject)}"></label>
- <label class="text-blue-100">Jenjang<select id="qGrade" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white">${['SD','SMP','SMA/SMK'].map(g=>`<option ${old.grade===g?'selected':''}>${g}</option>`).join('')}</select></label>
+ <div class="text-blue-100 rounded-lg bg-emerald-500/15 p-2">Jenjang: SD · Kelas 1–6</div>
  <label class="text-blue-100">Topik / tujuan pembelajaran<input id="qTopic" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white" value="${safeText(old.topic||'Konsep dasar')}"></label>
  <label class="text-blue-100">Tingkat kesulitan<select id="qDifficulty" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white">${['Dasar','Menengah','Lanjutan'].map(g=>`<option ${old.difficulty===g?'selected':''}>${g}</option>`).join('')}</select></label>
  <label class="text-blue-100">Tipe<select id="qType" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white">${[['mcq','Pilihan ganda'],['tf','Benar/Salah'],['short','Isian singkat']].map(([v,l])=>`<option value="${v}" ${old.type===v?'selected':''}>${l}</option>`).join('')}</select></label>
@@ -3609,8 +3628,8 @@ function questionEditor(index=null){
  <label class="text-blue-100 col-span-2">Pembahasan<textarea id="qExplanation" rows="2" class="w-full mt-1 bg-slate-800 rounded-lg p-2 text-white">${safeText(old.explanation)}</textarea></label>
  </div><button id="saveQuestion" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold">SIMPAN SOAL</button>`);
  setTimeout(()=>document.getElementById('saveQuestion').onclick=()=>{
-  const q={id:old.id,subject:document.getElementById('qSubject').value.trim(),grade:document.getElementById('qGrade').value,topic:document.getElementById('qTopic').value.trim()||'Konsep dasar',difficulty:document.getElementById('qDifficulty').value,type:document.getElementById('qType').value,question:document.getElementById('qQuestion').value.trim(),options:document.getElementById('qOptions').value.split('\n').map(x=>x.trim()).filter(Boolean),answer:document.getElementById('qAnswer').value.trim(),explanation:document.getElementById('qExplanation').value.trim()};
-  if(!q.subject||!q.question||!q.answer||!q.explanation||((q.type==='mcq'||q.type==='tf')&&q.options.length<2)){showToast('Lengkapi pertanyaan, pilihan, kunci, dan pembahasan.');return;}
+  const q={id:old.id,subject:document.getElementById('qSubject').value.trim(),grade:'SD',topic:document.getElementById('qTopic').value.trim()||'Konsep dasar',difficulty:document.getElementById('qDifficulty').value,type:document.getElementById('qType').value,question:document.getElementById('qQuestion').value.trim(),options:document.getElementById('qOptions').value.split('\n').map(x=>x.trim()).filter(Boolean),answer:document.getElementById('qAnswer').value.trim(),explanation:document.getElementById('qExplanation').value.trim()};
+  if(q.grade!=='SD'||!q.subject||!q.question||!q.answer||!q.explanation||((q.type==='mcq'||q.type==='tf')&&q.options.length<2)){showToast('Lengkapi pertanyaan, pilihan, kunci, dan pembahasan.');return;}
   if(index===null)questionBank.push(q);else questionBank[index]=q;
   localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));teacherDashboard('questions');
  },0);
@@ -3620,7 +3639,7 @@ function teacherJsonEditor(){
  openModal(`<div class="brand text-2xl font-bold mb-2">Impor / Ekspor Bank Soal JSON</div><textarea id="bankJson" class="w-full h-64 bg-slate-950/80 rounded-xl p-3 text-xs text-emerald-100 font-mono">${safeText(json)}</textarea><button id="saveBankBtn" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold">VALIDASI & SIMPAN JSON</button>`);
  setTimeout(()=>document.getElementById('saveBankBtn').onclick=()=>{
   try{const data=JSON.parse(document.getElementById('bankJson').value);if(!Array.isArray(data)||!data.length)throw Error('JSON harus berupa array soal.');
-   data.forEach((q,i)=>{if(!q.id||!q.subject||!q.grade||!['mcq','tf','short'].includes(q.type)||!q.question||q.answer===undefined||!q.explanation||((q.type==='mcq'||q.type==='tf')&&(!Array.isArray(q.options)||q.options.length<2)))throw Error('Struktur soal nomor '+(i+1)+' belum lengkap.');});
+   data.forEach((q,i)=>{if(!q.id||!q.subject||q.grade!=='SD'||!['mcq','tf','short'].includes(q.type)||!q.question||q.answer===undefined||!q.explanation||((q.type==='mcq'||q.type==='tf')&&(!Array.isArray(q.options)||q.options.length<2)))throw Error('Soal nomor '+(i+1)+' harus berjenjang SD dan memiliki struktur lengkap.');});
    questionBank=data;localStorage.setItem('alfajar_question_bank',JSON.stringify(questionBank));teacherDashboard('questions');
   }catch(e){showToast('Gagal: '+e.message);}
  },0);
@@ -3628,7 +3647,7 @@ function teacherJsonEditor(){
 function materialEditor(){
  openModal(`<div class="brand text-2xl font-bold mb-3">Tambah Materi</div><div class="space-y-2 text-xs">
  <label class="block text-blue-100">Judul<input id="matTitle" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white"></label>
- <div class="grid grid-cols-2 gap-2"><label class="text-blue-100">Mapel<input id="matSubject" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white" value="Matematika"></label><label class="text-blue-100">Jenjang<select id="matGrade" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white"><option>SD</option><option>SMP</option><option>SMA/SMK</option></select></label></div>
+ <div class="grid grid-cols-2 gap-2"><label class="text-blue-100 col-span-2">Mata pelajaran<input id="matSubject" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white" value="Matematika"></label><div class="col-span-2 rounded-lg bg-emerald-500/15 p-2 text-emerald-100">Jenjang materi: SD · Kelas 1–6</div></div>
  <label class="block text-blue-100">Isi materi<textarea id="matContent" rows="5" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white" placeholder="Tuliskan ringkasan materi..."></textarea></label>
  <label class="block text-blue-100">Link video / sumber (opsional)<input id="matUrl" type="url" class="w-full mt-1 bg-slate-800 rounded-lg p-3 text-white" placeholder="https://..."></label>
  <button id="saveMaterial" class="w-full bg-emerald-500 rounded-xl p-3 font-extrabold">SIMPAN MATERI</button></div>`);
@@ -3636,7 +3655,7 @@ function materialEditor(){
   const title=document.getElementById('matTitle').value.trim(),content=document.getElementById('matContent').value.trim(),url=document.getElementById('matUrl').value.trim();
   if(!title||!content){showToast('Judul dan isi materi wajib diisi.');return;}
   if(url&&!/^https?:\/\//i.test(url)){showToast('Link harus diawali http:// atau https://');return;}
-  teacherMaterials.push({title,content,url,subject:document.getElementById('matSubject').value.trim(),grade:document.getElementById('matGrade').value});
+  teacherMaterials.push({title,content,url,subject:document.getElementById('matSubject').value.trim(),grade:'SD'});
   persistTeacherData();teacherDashboard('materials');
  },0);
 }
@@ -3694,10 +3713,10 @@ function openMaterialHub(placeName=null){
   </div>`;
  }).join('');
  openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-book-open text-sky-300 mr-2"></i>RUANG MATERI</div>
- <p class="text-sm text-blue-100 mb-3">${placeName?'Selamat datang di '+safeText(placeName)+'. ':''}Pelajari materi sesuai jenjang yang sedang dipilih.</p>
- <div class="flex items-center justify-between rounded-xl bg-white/10 p-3 mb-3"><div><small class="text-blue-200">JENJANG AKTIF</small><b class="block">${safeText(grade)}</b></div><span class="text-xs text-blue-200">Materi tersedia: ${available.length}</span></div>
+ <p class="text-sm text-blue-100 mb-3">${placeName?'Selamat datang di '+safeText(placeName)+'. ':''}Pelajari materi Sekolah Dasar sesuai kelas yang dipilih.</p>
+ <div class="flex items-center justify-between rounded-xl bg-white/10 p-3 mb-3"><div><small class="text-blue-200">JENJANG AKTIF · SD</small><b class="block">${safeText(grade)}</b></div><span class="text-xs text-blue-200">Materi tersedia: ${available.length}</span></div>
  ${cards||'<div class="rounded-xl bg-white/10 p-4 text-sm text-blue-100">Belum ada materi untuk jenjang ini. Guru dapat menambahkan materi melalui Mode Guru.</div>'}
- <p class="text-[11px] text-blue-200">Materi bawaan saat ini tersedia untuk Matematika SD Kelas 3. Materi jenjang atau mata pelajaran lain dapat ditambahkan guru melalui Mode Guru.</p>`);
+ <p class="text-[11px] text-blue-200">Materi bawaan saat ini tersedia untuk Matematika dan IPAS SD Kelas 3. Guru dapat menambahkan materi SD kelas 1–6 melalui Mode Guru.</p>`);
  setTimeout(()=>document.querySelectorAll('.openBuiltLesson').forEach(b=>b.onclick=()=>openLessonDetail(b.dataset.subject,Number(b.dataset.index))),0);
 }
 
@@ -3741,15 +3760,15 @@ function questionFitsClass(q,grade=selectedGrade,cls=selectedClass){
 function questionsForSelection(){return questionBank.filter(q=>questionFitsClass(q));}
 function classLabel(){return 'Kelas '+selectedClass;}
 function openChallengeHub(prefSubject=null){
- const grades=['SD','SMP','SMA/SMK'];
+ const grades=['SD'];
  const getSubjects=g=>[...new Set(questionBank.filter(q=>questionFitsClass(q,g,selectedClass)).map(q=>q.subject))].sort();
  const getChapters=(s,g)=>[...new Set(questionBank.filter(q=>questionFitsClass(q,g,selectedClass)&&q.subject===s&&q.chapter).map(q=>q.chapter))];
  const count=(s,c,g)=>questionBank.filter(q=>questionFitsClass(q,g,selectedClass)&&q.subject===s&&(!c||q.chapter===c)).length;
  const initialSubjects=getSubjects(selectedGrade),initial=(prefSubject&&initialSubjects.includes(prefSubject))?prefSubject:(initialSubjects[0]||'');
  openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-trophy text-amber-300 mr-2"></i>ARENA TANTANGAN</div>
- <p class="text-sm text-blue-100 mb-4">Tantangan difilter berdasarkan jenjang dan kelas. Soal khusus kelas lain tidak akan dicampur.</p>
+ <p class="text-sm text-blue-100 mb-4">Tantangan khusus siswa SD. Soal difilter berdasarkan kelas dan tidak dicampur dengan kelas lain.</p>
  <div class="grid grid-cols-2 gap-2 mb-3">
- <label class="text-xs font-bold text-blue-100">JENJANG<select id="challengeGrade" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${grades.map(g=>`<option ${g===selectedGrade?'selected':''}>${g}</option>`).join('')}</select></label>
+ <div class="text-xs font-bold text-emerald-200 rounded-xl bg-emerald-500/15 p-3">🎒 JENJANG: SEKOLAH DASAR (SD)</div>
  <label class="text-xs font-bold text-blue-100">MATA PELAJARAN<select id="challengeSubject" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3">${initialSubjects.map(s=>`<option ${s===initial?'selected':''}>${safeText(s)}</option>`).join('')}</select></label>
  <label class="col-span-2 text-xs font-bold text-blue-100">BAB / MATERI<select id="challengeChapter" class="mt-1 w-full bg-slate-800 text-white rounded-xl p-3"><option value="">Semua bab</option>${getChapters(initial,selectedGrade).map(c=>`<option>${safeText(c)}</option>`).join('')}</select></label></div>
  <div class="rounded-xl bg-sky-500/15 p-3 text-xs text-blue-100 mb-2">Kelas aktif: <b>Kelas ${selectedClass}</b></div><div id="challengeAvailability" class="rounded-xl bg-white/10 p-3 text-xs text-blue-100 mb-3"></div>
@@ -3758,27 +3777,21 @@ function openChallengeHub(prefSubject=null){
  <button data-mode="campuran" class="challengeMode bg-violet-600 rounded-xl p-3 text-left"><b>🧩 Tantangan Campuran</b><small class="block text-violet-100 mt-1">10 soal · beragam topik</small></button>
  <button data-mode="fokus" class="challengeMode bg-emerald-600 rounded-xl p-3 text-left"><b>🎯 Tantangan Fokus Bab</b><small class="block text-emerald-100 mt-1">10 soal · satu bab pilihan</small></button>
  <button data-mode="maraton" class="challengeMode bg-amber-500 text-slate-900 rounded-xl p-3 text-left"><b>🏆 Tantangan Maraton</b><small class="block text-slate-800 mt-1">15 soal · uji ketekunan</small></button></div>
- <p class="text-[11px] text-blue-200 mt-3">Jika soal pada jenjang tertentu belum tersedia, game tidak menggantinya dengan soal jenjang lain.</p>`);
+ <p class="text-[11px] text-blue-200 mt-3">Jika soal untuk kelas SD tertentu belum tersedia, game tidak menggantinya dengan soal kelas lain.</p>`);
  setTimeout(()=>{
-  const $=id=>document.getElementById(id),g=$('challengeGrade'),s=$('challengeSubject'),c=$('challengeChapter'),info=$('challengeAvailability');
+  const $=id=>document.getElementById(id),g={value:'SD'},s=$('challengeSubject'),c=$('challengeChapter'),info=$('challengeAvailability');
   const sync=()=>{
    const list=getSubjects(g.value),old=s.value;s.innerHTML=list.map(x=>`<option>${safeText(x)}</option>`).join('');if(list.includes(old))s.value=old;
    const ch=getChapters(s.value,g.value);c.innerHTML='<option value="">Semua bab</option>'+ch.map(x=>`<option>${safeText(x)}</option>`).join('');
    info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value||'jenjang ini'} · ${g.value}.`;
   };
-  g.onchange=()=>{
-  selectedGrade=g.value;selectedClass=g.value==='SD'?3:g.value==='SMP'?7:10;
-  try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
-  const classBadge=document.querySelector('#challengeAvailability')?.previousElementSibling;
-  if(classBadge)classBadge.innerHTML='Kelas aktif: <b>Kelas '+selectedClass+'</b>';
-  sync();
- };s.onchange=()=>{const ch=getChapters(s.value,g.value);c.innerHTML='<option value="">Semua bab</option>'+ch.map(x=>`<option>${safeText(x)}</option>`).join('');info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value} · ${g.value}.`;};
+  selectedGrade='SD';s.onchange=()=>{const ch=getChapters(s.value,g.value);c.innerHTML='<option value="">Semua bab</option>'+ch.map(x=>`<option>${safeText(x)}</option>`).join('');info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value} · ${g.value}.`;};
   c.onchange=()=>info.textContent=`Tersedia ${count(s.value,c.value,g.value)} soal untuk ${s.value} · ${g.value}.`;sync();
   document.querySelectorAll('.challengeMode').forEach(b=>b.onclick=()=>{
    const mode=b.dataset.mode,chapter=c.value||null,pool=questionBank.filter(q=>q.subject===s.value&&questionFitsClass(q,g.value,selectedClass)&&(!chapter||q.chapter===chapter)),needed=mode==='kilat'?5:mode==='maraton'?15:10;
-   if(!pool.length){showToast('Belum ada soal untuk jenjang dan materi ini.');return;}
+   if(!pool.length){showToast('Belum ada soal untuk kelas dan materi SD ini.');return;}
    if(mode==='fokus'&&!chapter){showToast('Pilih satu bab terlebih dahulu.');return;}
-   selectedGrade=g.value;try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+   selectedGrade=g.value;try{localStorage.setItem('alfajar_selected_grade','SD');localStorage.setItem('alfajar_selected_class',String(Math.min(6,Math.max(1,Number(selectedClass)||3))));}catch(e){}
    closeModal();startChallengeRun(s.value,g.value,chapter,mode,needed);
   });
  },0);
@@ -3791,7 +3804,8 @@ function startChallengeRun(subject,grade,chapter,mode,count){
  renderQuizQuestion();
 }
 
-function startQuiz(subject,grade,difficulty='Semua',topic=null,chapter=null){
+function startQuiz(subject,grade='SD',difficulty='Semua',topic=null,chapter=null){
+ grade='SD';selectedGrade='SD';
  const pool=questionBank.filter(q=>q.subject===subject&&questionFitsClass(q,grade,selectedClass)&&(difficulty==='Semua'||(q.difficulty||'Dasar')===difficulty)&&(!topic||topicOf(q)===topic)&&(!chapter||q.chapter===chapter));
  if(!pool.length){showToast('Belum ada soal untuk pilihan tersebut. Guru dapat menambahkan soal.');return;}
  const shuffled=pool.slice().sort(()=>Math.random()-.5).slice(0,Math.min(10,pool.length));
@@ -3891,7 +3905,7 @@ function studentPortal(tab='profile'){
  const nav=`<div class="flex gap-2 mb-4"><button class="studentTab px-3 py-2 rounded-xl text-xs font-extrabold ${tab==='profile'?'bg-amber-400 text-slate-900':'bg-white/10'}" data-tab="profile">Profil & Kelas</button><button class="studentTab px-3 py-2 rounded-xl text-xs font-extrabold ${tab==='progress'?'bg-amber-400 text-slate-900':'bg-white/10'}" data-tab="progress">Progresku</button><button class="studentTab px-3 py-2 rounded-xl text-xs font-extrabold ${tab==='rank'?'bg-amber-400 text-slate-900':'bg-white/10'}" data-tab="rank">Peringkat</button><button class="studentTab px-3 py-2 rounded-xl text-xs font-extrabold ${tab==='badges'?'bg-amber-400 text-slate-900':'bg-white/10'}" data-tab="badges">Lencana</button><button class="studentTab px-3 py-2 rounded-xl text-xs font-extrabold ${tab==='report'?'bg-amber-400 text-slate-900':'bg-white/10'}" data-tab="report">Rapor</button></div>`;
  let body='';
  if(tab==='profile'){
-  body=`<div class="bg-white/10 rounded-xl p-4 mb-3"><div class="text-xs text-blue-100 mb-1">IDENTITAS PEMAIN</div><label class="block text-sm mb-2">Nama tampilan<input id="studentName" maxlength="28" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(studentProfile.name)}" placeholder="Nama panggilan"></label><label class="block text-sm mb-2">Jenjang<select id="studentGrade" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${['SD','SMP','SMA/SMK'].map(g=>`<option ${studentProfile.grade===g?'selected':''}>${g}</option>`).join('')}</select></label><label class="block text-sm">Kode kelas<input id="studentCode" maxlength="16" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white uppercase" value="${safeText(studentProfile.classCode)}" placeholder="Masukkan kode dari guru"></label><p class="text-xs text-blue-200 mt-2">${matchingClass?'Terhubung secara lokal ke: '+safeText(matchingClass.name):'Masukkan kode kelas yang dibuat guru pada perangkat/browser yang sama.'}</p><button id="saveStudent" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold">SIMPAN PROFIL</button></div><p class="text-[11px] text-blue-200">Catatan: kode kelas pada versi ini bekerja pada data lokal di browser yang sama. Belum ada sinkronisasi antargawai.</p>`;
+  body=`<div class="bg-white/10 rounded-xl p-4 mb-3"><div class="text-xs text-blue-100 mb-1">IDENTITAS PEMAIN</div><label class="block text-sm mb-2">Nama tampilan<input id="studentName" maxlength="28" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(studentProfile.name)}" placeholder="Nama panggilan"></label><div class="text-xs text-emerald-200 mb-2 rounded-lg bg-emerald-500/15 p-3">Jenjang pendidikan: Sekolah Dasar (SD)</div><label class="block text-sm">Kode kelas<input id="studentCode" maxlength="16" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white uppercase" value="${safeText(studentProfile.classCode)}" placeholder="Masukkan kode dari guru"></label><p class="text-xs text-blue-200 mt-2">${matchingClass?'Terhubung secara lokal ke: '+safeText(matchingClass.name):'Masukkan kode kelas yang dibuat guru pada perangkat/browser yang sama.'}</p><button id="saveStudent" class="w-full mt-3 bg-emerald-500 rounded-xl p-3 font-extrabold">SIMPAN PROFIL</button></div><p class="text-[11px] text-blue-200">Catatan: kode kelas pada versi ini bekerja pada data lokal di browser yang sama. Belum ada sinkronisasi antargawai.</p>`;
  }else if(tab==='progress'){
   const avg=myResults.length?Math.round(myResults.reduce((a,r)=>a+r.percent,0)/myResults.length):0;
   body=`<div class="grid grid-cols-3 gap-2 mb-3"><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${myResults.length}</b><div class="text-[10px] text-blue-100">KUIS</div></div><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${avg}%</b><div class="text-[10px] text-blue-100">RATA-RATA</div></div><div class="bg-white/10 rounded-xl p-3"><b class="text-2xl">${learningProgress.bestScore}%</b><div class="text-[10px] text-blue-100">TERBAIK</div></div></div><div class="space-y-2">${myResults.length?myResults.slice().reverse().map(r=>`<div class="bg-white/10 rounded-xl p-3 flex justify-between"><div><b>${safeText(r.subject)}</b><div class="text-xs text-blue-100">${safeText(r.date)}</div></div><b class="text-amber-300 text-xl">${r.percent}%</b></div>`).join(''):'<p class="text-sm text-blue-100">Belum ada kuis atas nama ini. Selesaikan kuis untuk melihat progres.</p>'}</div>`;
@@ -3927,7 +3941,7 @@ function studentPortal(tab='profile'){
    const code=document.getElementById('studentCode').value.trim().toUpperCase();
    const cls=teacherClasses.find(c=>String(c.code).toUpperCase()===code);
    if(code&&!cls){showToast('Kode kelas tidak ditemukan pada penyimpanan lokal ini.');return;}
-   studentProfile={name,grade:document.getElementById('studentGrade').value,classCode:code,className:cls?cls.name:''};saveStudentProfile();initWorldChannel();if(worldSocket){disconnectWorldServer();}showToast('Profil siswa tersimpan.');studentPortal('profile');
+   studentProfile={name,grade:'SD',classCode:code,className:cls?cls.name:''};saveStudentProfile();initWorldChannel();if(worldSocket){disconnectWorldServer();}showToast('Profil siswa tersimpan.');studentPortal('profile');
   };
  },0);
 }
@@ -3940,7 +3954,7 @@ function classroomPanel(mode='student'){
   openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-chalkboard-user text-amber-300 mr-2"></i>PENGELOLAAN KELAS</div><p class="text-xs text-blue-100 mb-3">Terbitkan materi, pengumuman, dan tugas untuk siswa.</p>
   <div class="space-y-2 text-xs">
    <label class="block text-blue-100">Judul pembelajaran<input id="clTitle" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(classroomState.lessonTitle)}"></label>
-   <div class="grid grid-cols-2 gap-2"><label class="text-blue-100">Mata pelajaran<input id="clSubject" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(classroomState.subject)}"></label><label class="text-blue-100">Jenjang<select id="clGrade" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${['SD','SMP','SMA/SMK'].map(g=>`<option ${classroomState.grade===g?'selected':''}>${g}</option>`).join('')}</select></label></div>
+   <div class="grid grid-cols-2 gap-2"><label class="text-blue-100 col-span-2">Mata pelajaran<input id="clSubject" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(classroomState.subject)}"></label><div class="col-span-2 rounded-lg bg-emerald-500/15 p-2 text-emerald-100">Jenjang kelas virtual: SD</div></div>
    <label class="block text-blue-100">Pengumuman<textarea id="clAnnouncement" rows="2" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${safeText(classroomState.announcement)}</textarea></label>
    <label class="block text-blue-100">Materi / catatan papan tulis<textarea id="clLesson" rows="4" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white">${safeText(classroomState.lessonText)}</textarea></label>
    <label class="block text-blue-100">Judul tugas<input id="clAssignmentTitle" class="w-full mt-1 bg-slate-800 rounded-xl p-3 text-white" value="${safeText(classroomState.assignmentTitle)}"></label>
@@ -3953,7 +3967,7 @@ function classroomPanel(mode='student'){
    const b=document.getElementById('publishClass');if(b)b.onclick=()=>{
     const v=id=>document.getElementById(id).value.trim();
     if(!v('clTitle')||!v('clLesson')||!v('clAssignmentTitle')||!v('clAssignmentText')){showToast('Lengkapi judul, materi, dan tugas.');return;}
-    classroomState={...classroomState,lessonTitle:v('clTitle'),subject:v('clSubject'),grade:document.getElementById('clGrade').value,announcement:v('clAnnouncement'),lessonText:v('clLesson'),assignmentTitle:v('clAssignmentTitle'),assignmentText:v('clAssignmentText')};
+    classroomState={...classroomState,lessonTitle:v('clTitle'),subject:v('clSubject'),grade:'SD',announcement:v('clAnnouncement'),lessonText:v('clLesson'),assignmentTitle:v('clAssignmentTitle'),assignmentText:v('clAssignmentText')};
     saveClassroomState();showToast('Pembelajaran berhasil diterbitkan.');classroomPanel('teacher');
    };
    const sv=document.getElementById('classStudentView');if(sv)sv.onclick=()=>classroomPanel('student');
@@ -3982,6 +3996,25 @@ function classroomPanel(mode='student'){
  }
 }
 
+function updateAvatarHairStyle(){
+ const isFemale=String(avatarState.gender||'Laki-laki').toLowerCase().includes('perempuan');
+ const style=avatarState.hairStyle||'Klasik';
+ const color=avatarState.hair||0x3c2d28;
+ [hairMesh,maleHairL,maleHairR,maleFringe,maleSideSweep,maleBun,femaleHairBack,femaleHairTop,femaleHairL,femaleHairR,femaleFringe,femaleHairClip,femaleBun,femaleSideFringe].forEach(m=>setMaterialColor(m,color));
+ // Hide every optional style piece first, then enable the selected silhouette.
+ maleFringe.visible=!isFemale&&style==='Poni';
+ maleSideSweep.visible=!isFemale&&style==='Rapi';
+ maleBun.visible=!isFemale&&style==='Cepol';
+ femaleFringe.visible=isFemale&&style==='Poni';
+ femaleSideFringe.visible=isFemale&&style==='Rapi';
+ femaleBun.visible=isFemale&&style==='Cepol';
+ femaleHairClip.visible=isFemale&&style==='Cepol';
+ hairMesh.scale.set(1,style==='Cepol'?.82:style==='Rapi'?.72:1,1);
+ maleHairL.scale.y=style==='Rapi'?.3:1;maleHairR.scale.y=style==='Rapi'?.3:1;
+ femaleHairBack.scale.y=style==='Cepol'?.68:1;
+ femaleHairTop.scale.y=style==='Cepol'?.8:style==='Rapi'?.75:1;
+ femaleHairL.scale.y=style==='Cepol'?.72:1;femaleHairR.scale.y=style==='Cepol'?.72:1;
+}
 function applyAvatarLook(){
  const genderValue=String(avatarState.gender||'Laki-laki').trim().toLowerCase();
  const isFemale=genderValue==='perempuan'||genderValue.includes('perempuan');
@@ -3990,13 +4023,18 @@ function applyAvatarLook(){
  setMaterialColor(armL.children[1],avatarState.skin);setMaterialColor(armR.children[1],avatarState.skin);
  setMaterialColor(hairMesh,avatarState.hair);
  [maleHairL,maleHairR].forEach(m=>setMaterialColor(m,avatarState.hair));
- [femaleHairBack,femaleHairTop,femaleHairL,femaleHairR,femaleFringe].forEach(m=>setMaterialColor(m,avatarState.hair));
+ [femaleHairBack,femaleHairTop,femaleHairL,femaleHairR,femaleFringe,femaleHairClip,femaleBun,femaleSideFringe].forEach(m=>setMaterialColor(m,avatarState.hair));
  // Toggle actual mesh groups for a clearly different silhouette.
  femaleHair.visible=isFemale;
  hairMesh.visible=!isFemale;
  maleHairL.visible=!isFemale;maleHairR.visible=!isFemale;
+ updateAvatarHairStyle();
  if(typeof femaleSkirt!=='undefined')femaleSkirt.visible=isFemale;
  if(typeof maleJacket!=='undefined')maleJacket.visible=!isFemale;
+ // Hair presets reuse the existing voxel meshes, keeping the avatar lightweight.
+ const hairPreset=avatarState.hairStyle||'Klasik';
+ hairMesh.scale.set(hairPreset==='Poni'?1.18:hairPreset==='Rapi'?.88:1, hairPreset==='Cepol'?.78:1, 1);
+ femaleHairTop.scale.set(1,hairPreset==='Cepol'?.82:1,1);
  setMaterialColor(skirtMat,avatarState.outfit);
  setMaterialColor(torso,avatarState.outfit);
  setMaterialColor(armL.children[0],avatarState.outfit);setMaterialColor(armR.children[0],avatarState.outfit);
@@ -4069,41 +4107,62 @@ function openShop(tab='shop'){
  render();
 }
 function avatarPanel(){
- openModal(`<div class="brand text-2xl font-bold mb-1">STUDIO AVATAR</div><p class="text-blue-100 text-sm mb-4">Ubah penampilan karaktermu. Perubahan langsung terlihat di dunia 3D.</p>
- <div class="grid grid-cols-2 gap-3 text-sm">
+ const name=(localStorage.getItem('alfajar_character_name')||'Petualang').trim();
+ const mode=(localStorage.getItem('alfajar_session_mode')||localStorage.getItem('alfajar_play_mode')||'guest').toLowerCase();
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-user-astronaut text-amber-300 mr-2"></i>CHARACTER STUDIO 2.0</div>
+ <div class="rounded-2xl bg-gradient-to-r from-sky-500/25 to-indigo-500/25 border border-white/10 p-3 mb-3 flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-amber-300 text-slate-900 grid place-items-center text-2xl"><i class="fa-solid fa-user"></i></div><div class="min-w-0 flex-1"><b class="block truncate">${safeText(name)}</b><p class="text-[11px] text-blue-100">${mode==='guest'?'Mode Tamu':'Akun Terdaftar'} · Level ${playerLevel||1}</p><p class="text-[10px] text-blue-200">Atur identitas dan gaya karakter di sini</p></div></div>
+ <div class="grid grid-cols-2 gap-2 text-xs mb-3"><button id="avTabLook" class="rounded-xl p-2.5 bg-sky-600 font-bold">PENAMPILAN</button><button id="avTabWardrobe" class="rounded-xl p-2.5 bg-white/10 font-bold">LEMARI PAKAIAN</button></div>
+ <div id="avLookPane"><div class="grid grid-cols-2 gap-2 text-sm">
   <label class="bg-white/10 rounded-xl p-3">Karakter<select id="avGender" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option>Laki-laki</option><option>Perempuan</option></select></label>
   <label class="bg-white/10 rounded-xl p-3">Warna kulit<select id="avSkin" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="d99b72">Sawo matang</option><option value="f1c7a5">Cerah</option><option value="a96e4f">Cokelat</option><option value="754a37">Gelap</option></select></label>
-  <label class="bg-white/10 rounded-xl p-3">Rambut<select id="avHair" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="3c2d28">Hitam</option><option value="70452d">Cokelat</option><option value="d4a64d">Pirang</option><option value="273d59">Biru gelap</option></select></label>
-  <label class="bg-white/10 rounded-xl p-3">Pakaian<select id="avOutfit" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="347fca">Seragam biru</option><option value="26966e">Seragam hijau</option><option value="e8e8e8">Seragam putih</option><option value="b65e58">Batik merah</option><option value="704b9a">Seragam pramuka</option></select></label>
-  <label class="bg-white/10 rounded-xl p-3 col-span-2">Aksesori<select id="avWear" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="Tas">Tas sekolah</option><option value="Topi">Topi</option><option value="Kacamata">Kacamata</option><option value="Tanpa">Tanpa aksesori</option></select></label>
- </div>
- <button id="saveAvatar" class="mt-4 w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl px-4 py-3">Terapkan Penampilan</button>`);
+  <label class="bg-white/10 rounded-xl p-3">Warna rambut<select id="avHair" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="3c2d28">Hitam</option><option value="70452d">Cokelat</option><option value="d4a64d">Pirang</option><option value="273d59">Biru gelap</option><option value="7b477d">Ungu</option></select></label>
+  <label class="bg-white/10 rounded-xl p-3">Model rambut<select id="avHairStyle" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option>Klasik</option><option>Poni</option><option>Rapi</option><option>Cepol</option></select></label>
+  <label class="bg-white/10 rounded-xl p-3">Warna pakaian<select id="avOutfit" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="347fca">Seragam biru</option><option value="26966e">Seragam hijau</option><option value="e8e8e8">Seragam putih</option><option value="b65e58">Batik merah</option><option value="704b9a">Seragam pramuka</option><option value="35a6a0">Olahraga teal</option><option value="9a593c">Batik Nusantara</option></select></label>
+  <label class="bg-white/10 rounded-xl p-3">Aksesori<select id="avWear" class="mt-2 w-full bg-slate-800 rounded-lg p-2 text-white"><option value="Tas">Tas sekolah</option><option value="Topi">Topi</option><option value="Kacamata">Kacamata</option><option value="Tanpa">Tanpa aksesori</option></select></label>
+ </div><button id="saveAvatar" class="mt-3 w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl px-4 py-3"><i class="fa-solid fa-check mr-1"></i> SIMPAN PENAMPILAN</button></div>
+ <div id="avWardrobePane" class="hidden"><p class="text-xs text-blue-100 mb-2">Koleksi pakaian dan aksesori yang sudah dimiliki.</p><div id="avWardrobeList" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div><button id="avOpenShop" class="mt-3 w-full bg-amber-400 text-slate-900 font-extrabold rounded-xl p-3">BUKA TOKO KOSMETIK</button></div>
+ <p class="text-[10px] text-blue-200 mt-3">Penampilan hanya bersifat kosmetik. Progres belajar dan kemampuan karakter tidak berubah.</p>`);
  setTimeout(()=>{
-  const $=id=>document.getElementById(id);
-  $('avGender').value=avatarState.gender;$('avSkin').value=avatarState.skin.toString(16).padStart(6,'0');
-  $('avHair').value=avatarState.hair.toString(16).padStart(6,'0');$('avOutfit').value=avatarState.outfit.toString(16).padStart(6,'0');$('avWear').value=avatarState.wear;
-  const updateGenderPreview=()=>{avatarState.gender=$('avGender').value;applyAvatarLook();showToast('Model karakter diperbarui: '+avatarState.gender);};
-  $('avGender').addEventListener('change',updateGenderPreview);
-  $('avGender').addEventListener('input',updateGenderPreview);
-  $('saveAvatar').onclick=()=>{
-   avatarState.gender=$('avGender').value;avatarState.skin=parseInt($('avSkin').value,16);
-   avatarState.hair=parseInt($('avHair').value,16);avatarState.outfit=parseInt($('avOutfit').value,16);avatarState.wear=$('avWear').value;
-   applyAvatarLook();
-   closeModal();showToast('Avatar berhasil diperbarui!');
-  };
+  const $=id=>document.getElementById(id);const ids=['avGender','avSkin','avHair','avHairStyle','avOutfit','avWear'];
+  $('avGender').value=avatarState.gender;$('avSkin').value=avatarState.skin.toString(16).padStart(6,'0');$('avHair').value=avatarState.hair.toString(16).padStart(6,'0');$('avHairStyle').value=avatarState.hairStyle||'Klasik';$('avOutfit').value=avatarState.outfit.toString(16).padStart(6,'0');$('avWear').value=avatarState.wear;
+  // Live preview: hairstyle and gender changes are reflected on the 3D avatar immediately.
+  $('avHairStyle').addEventListener('change',()=>{avatarState.hairStyle=$('avHairStyle').value;updateAvatarHairStyle();});
+  $('avHair').addEventListener('change',()=>{avatarState.hair=parseInt($('avHair').value,16);updateAvatarHairStyle();});
+  $('avGender').addEventListener('change',()=>{avatarState.gender=$('avGender').value;applyAvatarLook();});
+  $('avTabLook').onclick=()=>{$('avLookPane').classList.remove('hidden');$('avWardrobePane').classList.add('hidden');$('avTabLook').className='rounded-xl p-2.5 bg-sky-600 font-bold';$('avTabWardrobe').className='rounded-xl p-2.5 bg-white/10 font-bold';};
+  $('avTabWardrobe').onclick=()=>{$('avLookPane').classList.add('hidden');$('avWardrobePane').classList.remove('hidden');$('avTabWardrobe').className='rounded-xl p-2.5 bg-sky-600 font-bold';$('avTabLook').className='rounded-xl p-2.5 bg-white/10 font-bold';renderWardrobe();};
+  function renderWardrobe(){const list=$('avWardrobeList');if(!list)return;const owned=shopCatalog.filter(it=>ownedShopItems.includes(it.id));list.innerHTML=owned.map(it=>`<div class="bg-white/10 rounded-xl p-3 flex items-center gap-2"><span class="text-2xl">${it.icon}</span><div class="flex-1 min-w-0"><b class="text-xs">${safeText(it.name)}</b><p class="text-[10px] text-blue-200">${it.type==='outfit'?'Pakaian':'Aksesori'}</p></div><button class="wardrobeEquip rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-bold" data-id="${it.id}">PAKAI</button></div>`).join('')||'<p class="text-xs text-blue-100 col-span-2">Belum ada koleksi tambahan. Kunjungi toko untuk mendapatkan item.</p>';list.querySelectorAll('.wardrobeEquip').forEach(btn=>btn.onclick=()=>{const it=shopCatalog.find(x=>x.id===btn.dataset.id);if(!it)return;if(it.type==='outfit')avatarState.outfit=it.value;else avatarState.wear=it.value;applyAvatarLook();showToast(it.name+' dipakai.');renderWardrobe();});}
+  $('avOpenShop').onclick=()=>openShop('shop');
+  $('saveAvatar').onclick=()=>{avatarState.gender=$('avGender').value;avatarState.skin=parseInt($('avSkin').value,16);avatarState.hair=parseInt($('avHair').value,16);avatarState.hairStyle=$('avHairStyle').value;avatarState.outfit=parseInt($('avOutfit').value,16);avatarState.wear=$('avWear').value;applyAvatarLook();closeModal();showToast('Penampilan karakter berhasil disimpan.');};
  },0);
 }
 
-// Safe fallback for the companion controls. The previous build referenced these
-// handlers without defining their companion model, which stopped initialization.
+// CHARACTER STUDIO 2.0 — lightweight 3D pet companion, saved with avatar appearance.
 let petActive=false;
-let petKind='Kucing';
-function setPetKind(kind){
-  petKind=['Kucing','Rubah','Robot'].includes(kind)?kind:'Kucing';
-  petActive=false;
+let petKind=avatarState.petKind||'Kucing';
+const petBuddy=group(scene,0,-20,0);petBuddy.visible=false;
+let petTail=null,petHead=null,petEarL=null,petEarR=null;
+function buildPetModel(kind='Kucing'){
+ while(petBuddy.children.length){const child=petBuddy.children[0];petBuddy.remove(child);child.traverse?.(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&!Array.isArray(o.material))o.material.dispose();});}
+ petTail=petHead=petEarL=petEarR=null;
+ const robot=kind==='Robot',fox=kind==='Rubah';
+ const main=robot?0x8ba6b8:fox?0xd97835:0xd6a15f;
+ const fur=mat(main),dark=mat(robot?0x344e68:fox?0x8f4525:0x8c6038),white=mat(0xf4e8d2),eye=mat(0x17283c),accent=mat(robot?0x49d5d0:0xf3c75b);
+ box(petBuddy,.62,.48,.72,fur,0,.48,0);
+ petHead=group(petBuddy,0,.82,.25);box(petHead,.58,.52,.5,fur,0,0,0);
+ box(petHead,.34,.2,.035,white,0,-.12,.265);
+ for(const x of [-.13,.13])sphere(petHead,.045,eye,x,.04,.27,8);
+ if(robot){box(petHead,.16,.07,.04,accent,0,.17,.27);box(petBuddy,.12,.24,.12,dark,0,.9,-.32);}
+ else{petEarL=group(petHead,-.2,.22,0);petEarR=group(petHead,.2,.22,0);box(petEarL,.16,.28,.15,dark,0,.08,0);box(petEarR,.16,.28,.15,dark,0,.08,0);if(fox){box(petHead,.24,.13,.18,white,0,-.13,.27);}}
+ petTail=group(petBuddy,0,.62,-.36);if(robot){box(petTail,.12,.48,.12,accent,0,-.12,-.18);}else{box(petTail,.2,.52,.2,fur,0,-.12,-.2);}
+ for(const x of [-.2,.2]){box(petBuddy,.16,.24,.18,dark,x,.12,.16);}
+ petBuddy.visible=petActive;
 }
+function setPetKind(kind){petKind=['Kucing','Rubah','Robot'].includes(kind)?kind:'Kucing';avatarState.petKind=petKind;try{localStorage.setItem('alfajar_avatar_v21',JSON.stringify(avatarState));}catch(e){}buildPetModel(petKind);}
 function togglePet(){
-  showToast('Fitur teman pendamping sedang diperbaiki. Fitur kota dan belajar tetap dapat digunakan.');
+ openModal(`<div class="brand text-2xl font-bold mb-1"><i class="fa-solid fa-paw text-amber-300 mr-2"></i>TEMAN PENDAMPING</div><p class="text-xs text-blue-100 mb-3">Pilih teman yang akan menemanimu menjelajahi Al Fajar City.</p><div class="grid grid-cols-3 gap-2">${[['Kucing','🐱'],['Rubah','🦊'],['Robot','🤖']].map(([k,e])=>`<button class="petChoice rounded-xl p-3 ${petKind===k?'bg-sky-600':'bg-white/10'}" data-kind="${k}"><div class="text-3xl">${e}</div><b class="text-xs">${k}</b></button>`).join('')}</div><div class="rounded-xl bg-white/10 p-3 mt-3 text-xs"><b>Status teman:</b> ${petActive?'Sedang menemani':'Belum mengikuti'}<p class="text-blue-100 mt-1">Teman pendamping akan mengikuti langkah karakter dan bergerak ringan di dekatmu.</p></div><button id="petToggle" class="mt-3 w-full rounded-xl p-3 font-extrabold ${petActive?'bg-rose-500':'bg-emerald-500'}">${petActive?'NONAKTIFKAN TEMAN':'AKTIFKAN TEMAN'}</button>`);
+ document.querySelectorAll('.petChoice').forEach(btn=>btn.onclick=()=>{petKind=btn.dataset.kind;avatarState.petKind=petKind;setPetKind(petKind);queueAfCloudSave();togglePet();});
+ document.getElementById('petToggle').onclick=()=>{petActive=!petActive;petBuddy.visible=petActive;if(petActive){setPetKind(petKind);petBuddy.visible=true;}else petBuddy.visible=false;closeModal();showToast(petActive?petKind+' siap menemanimu!':'Teman pendamping dinonaktifkan.');};
 }
 
 document.getElementById('avatarBtn').onclick=avatarPanel;
@@ -4484,7 +4543,7 @@ function interact(){
   }else{
    const subjects=[...new Set(questionBank.map(q=>q.subject))];
    const subjectMatch=subjects.find(x=>subject.toLowerCase().includes(x.toLowerCase())||x.toLowerCase().includes(subject.toLowerCase()))||'Matematika';
-   const grade=questionBank.some(q=>q.subject===subjectMatch&&q.grade==='SMP')?'SMP':'SD';
+   const grade='SD';
    startQuiz(subjectMatch,grade);
   }
   return;
@@ -4967,11 +5026,11 @@ updateTrafficSignals();
   const targetPet=player.position.clone().add(behind);
   petBuddy.position.lerp(new THREE.Vector3(targetPet.x,player.position.y,targetPet.z),1-Math.exp(-dt*5));
   petBuddy.rotation.y=player.rotation.y;petBuddy.position.y=player.position.y+Math.abs(Math.sin(clock.elapsedTime*5))*.08;
-  petTail.rotation.z=Math.sin(clock.elapsedTime*8)*.48;
+  if(petTail)petTail.rotation.z=Math.sin(clock.elapsedTime*8)*.48;
   petBuddy.rotation.z=Math.sin(clock.elapsedTime*3.5)*.035;
-  petHead.rotation.y=Math.sin(clock.elapsedTime*2.2)*.12;
-  petEarL.rotation.z=Math.sin(clock.elapsedTime*5.5)*.08;
-  petEarR.rotation.z=-Math.sin(clock.elapsedTime*5.5)*.08;
+  if(petHead)petHead.rotation.y=Math.sin(clock.elapsedTime*2.2)*.12;
+  if(petEarL)petEarL.rotation.z=Math.sin(clock.elapsedTime*5.5)*.08;
+  if(petEarR)petEarR.rotation.z=-Math.sin(clock.elapsedTime*5.5)*.08;
  }
  npc.rotation.y=Math.sin(clock.elapsedTime*.7)*.12;
  drawMiniMap();
@@ -5292,7 +5351,7 @@ function openAccountAccess(tab='login'){
     <label class="block text-sm font-bold">Username<input id="accountUsername" maxlength="24" autocomplete="username" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Contoh: petualang123"></label>`:''}
     <label class="block text-sm font-bold">Email<input id="accountEmail" type="email" maxlength="120" autocomplete="email" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="nama@email.com"></label>
     <label class="block text-sm font-bold">Kata sandi<input id="accountPassword" type="password" minlength="8" autocomplete="${signup?'new-password':'current-password'}" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Minimal 8 karakter"></label>
-    ${signup?`<div class="grid grid-cols-2 gap-2"><label class="block text-sm font-bold">Jenjang<select id="accountGrade" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal"><option>SD</option><option>SMP</option><option>SMA</option><option>SMK</option></select></label><label class="block text-sm font-bold">Kelas<select id="accountClass" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal"></select></label></div>
+    ${signup?`<div class="grid grid-cols-2 gap-2"><div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800 font-bold">🎒 Jenjang: Sekolah Dasar (SD)</div><label class="block text-sm font-bold">Kelas<select id="accountClass" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal"><option value="1">Kelas 1</option><option value="2">Kelas 2</option><option value="3" selected>Kelas 3</option><option value="4">Kelas 4</option><option value="5">Kelas 5</option><option value="6">Kelas 6</option></select></label></div>
     <label class="block text-sm font-bold">Kode kelas <span class="font-normal text-slate-400">(opsional)</span><input id="accountClassCode" maxlength="20" class="w-full mt-1 rounded-xl border border-slate-300 p-3 font-normal" placeholder="Isi jika diberikan guru"></label>`:''}
    </div>
    <button id="accountSubmit" class="w-full mt-5 rounded-xl p-3 text-white font-black" style="background:linear-gradient(135deg,#16b86a,#087b4a)">${signup?'Buat Akun':'Masuk ke Akun'}</button>
@@ -5305,9 +5364,7 @@ function openAccountAccess(tab='login'){
    $('accountSignupTab').onclick=()=>{tab='signup';render();};
    $('accountPreviewClose').onclick=closeModal;
    if(signup){
-    const grade=$('accountGrade'),cls=$('accountClass');
-    const fill=()=>{const g=grade.value;const start=g==='SD'?1:g==='SMP'?7:10,end=g==='SD'?6:g==='SMP'?9:12;cls.innerHTML=Array.from({length:end-start+1},(_,i)=>`<option value="${start+i}">Kelas ${start+i}</option>`).join('');};
-    grade.onchange=fill;fill();
+    const cls=$('accountClass');
    }
    $('accountSubmit').onclick=async()=>{
     const btn=$('accountSubmit'),feedback=$('accountFeedback');
@@ -5323,7 +5380,8 @@ function openAccountAccess(tab='login'){
       if(!fullName||!username||!email||!password)throw new Error('Lengkapi nama, username, email, dan kata sandi.');
       if(!/^[a-z0-9_]{3,24}$/.test(username))throw new Error('Username harus 3–24 karakter, hanya huruf kecil, angka, dan garis bawah.');
       if(password.length<8)throw new Error('Kata sandi minimal 8 karakter.');
-      const grade=$('accountGrade').value, classLevel=Number($('accountClass').value);
+      const grade='SD', classLevel=Number($('accountClass').value);
+      if(!Number.isInteger(classLevel)||classLevel<1||classLevel>6)throw new Error('Pilih kelas SD 1 sampai 6.');
       const classCode=$('accountClassCode').value.trim();
       feedback.textContent='Mengirim pendaftaran ke server...';
       const {data,error}=await afWithTimeout(sb.auth.signUp({
@@ -5448,8 +5506,8 @@ async function loadAfCloudPlayer(authUser=null){
    (ch.appearance && Object.keys(ch.appearance).length>0)
   ));
   if(p){
-   selectedGrade=p.grade||selectedGrade;selectedClass=Number(p.class_level)||selectedClass;
-   try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
+   selectedGrade='SD';selectedClass=Number(p.class_level)||selectedClass;if(!Number.isInteger(selectedClass)||selectedClass<1||selectedClass>6)selectedClass=3;
+   try{localStorage.setItem('alfajar_selected_grade','SD');localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
   }
   if(pr){
    xp=Number(pr.xp)||0;coins=Number(pr.coins)||0;playerLevel=Math.max(1,Number(pr.level)||1);
@@ -5690,7 +5748,7 @@ function resetLocalPlayerForGuest(){
   localStorage.setItem('alfajar_owned_items_v21',JSON.stringify(ownedShopItems));
   localStorage.setItem(AF_REWARD_LEDGER_KEY,JSON.stringify({}));
   localStorage.setItem('alfajar_play_mode','guest');localStorage.setItem('alfajar_session_mode','guest');
-  localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));
+  localStorage.setItem('alfajar_selected_grade','SD');localStorage.setItem('alfajar_selected_class',String(Math.min(6,Math.max(1,Number(selectedClass)||3))));
   localStorage.setItem('alfajar_character_account_id','guest');
  }catch(e){}
 }
@@ -5793,6 +5851,7 @@ function openCharacterCreator(){
    avatarState.gender=$('avGender').value;
    avatarState.skin=parseInt($('avSkin').value,16);
    avatarState.hair=parseInt($('avHair').value,16);
+   avatarState.hairStyle=avatarState.hairStyle||'Klasik';
    avatarState.outfit=parseInt($('avOutfit').value,16);
    avatarState.wear=$('avWear').value;
    try{
@@ -5823,34 +5882,19 @@ function openCharacterCreator(){
 window.enterAlFajar=enterAlFajar;
 window.signOutAfAccount=signOutAfAccount;
 function refreshWorldChoice(){
- document.querySelectorAll('.gradeWorldBtn').forEach(btn=>{
-  const active=btn.dataset.grade===selectedGrade;
-  btn.style.background=active?'linear-gradient(135deg,#16b86a,#087b4a)':'rgba(255,255,255,.12)';
-  btn.style.borderColor=active?'#86efac':'rgba(255,255,255,.2)';
-  btn.style.boxShadow=active?'0 0 0 2px #86efac55':'none';
- });
+ selectedGrade='SD';
  const label=document.getElementById('selectedWorldLabel');
- if(label)label.textContent='Dunia terpilih: '+selectedGrade+' · Kelas '+selectedClass;
+ if(label)label.textContent='Dunia terpilih: Sekolah Dasar (SD) · Kelas '+selectedClass;
  const select=document.getElementById('selectedClassInput');
  if(select){
-  const first=selectedGrade==='SD'?1:selectedGrade==='SMP'?7:10;
-  const last=selectedGrade==='SD'?6:selectedGrade==='SMP'?9:12;
-  select.innerHTML=Array.from({length:last-first+1},(_,i)=>`<option value="${first+i}">Kelas ${first+i}</option>`).join('');
+  select.innerHTML=Array.from({length:6},(_,i)=>`<option value="${i+1}">Kelas ${i+1}</option>`).join('');
   select.value=String(selectedClass);
  }
  const note=document.getElementById('classAvailabilityNote');
- if(note)note.textContent=selectedGrade==='SD'&&selectedClass===3?'Bank soal Matematika, IPAS, dan Bahasa Indonesia Kelas 3 tersedia.':`Pilihan kelas ${selectedClass} aktif. Soal khusus kelas ini akan muncul jika bank soal atau soal guru sudah diberi label kelas ${selectedClass}.`;
+ if(note)note.textContent=selectedClass===3?'Bank soal Matematika dan IPAS Kelas 3 tersedia. Materi lain dapat ditambahkan melalui Mode Guru.':`Kelas ${selectedClass} dipilih. Materi dan soal akan mengikuti kelas SD ini.`;
 }
-document.querySelectorAll('.gradeWorldBtn').forEach(btn=>btn.addEventListener('click',()=>{
- selectedGrade=btn.dataset.grade;
- if(selectedGrade==='SD')selectedClass=3;
- else if(selectedGrade==='SMP')selectedClass=7;
- else selectedClass=10;
- try{localStorage.setItem('alfajar_selected_grade',selectedGrade);localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(e){}
- refreshWorldChoice();showToast('Dunia '+selectedGrade+' · Kelas '+selectedClass+' dipilih!');
-}));
 document.getElementById('selectedClassInput')?.addEventListener('change',e=>{
- selectedClass=Number(e.target.value)||3;
+ selectedClass=Math.min(6,Math.max(1,Number(e.target.value)||3));selectedGrade='SD';
  try{localStorage.setItem('alfajar_selected_class',String(selectedClass));}catch(err){}
  refreshWorldChoice();
  showToast('Kelas '+selectedClass+' dipilih!');
@@ -5922,7 +5966,7 @@ document.getElementById('welcomeTeacher').onclick=()=>enterAlFajar('teacher');
  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
 })();
 initWorldChannel();
-refreshWalletUI();applyAvatarLook();setPetKind(petKind);renderQuestPanel();saveDaily();
+refreshWalletUI();applyAvatarLook();setPetKind(petKind);petActive=false;petBuddy.visible=false;renderQuestPanel();saveDaily();
 camera.position.set(0,22,42);camera.lookAt(0,0,0);
 // v10.6 HD texture filtering: improve angled surface clarity without heavy post-processing.
 try{
