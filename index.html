@@ -3507,14 +3507,77 @@ try{tutorMistakes=JSON.parse(localStorage.getItem('alfajar_tutor_mistakes')||'[]
 function saveTutorMistakes(){try{localStorage.setItem('alfajar_tutor_mistakes',JSON.stringify(tutorMistakes.slice(-300)));}catch(e){}}
 function topicOf(q){return q.topic||'Konsep dasar';}
 function tutorHint(q){
- const t=String(q.question||'').toLowerCase();
- if(q.hint)return String(q.hint);
- if(t.includes('luas'))return 'Cari rumus luas bangun tersebut. Perhatikan ukuran dan satuannya.';
- if(t.includes('hasil')||/[0-9]\s*[+×÷\-]/.test(t))return 'Pisahkan informasi yang diketahui, pilih operasi yang tepat, lalu hitung perlahan.';
- if(t.includes('jika x')||t.includes('nilai x'))return 'Coba pindahkan bilangan ke ruas lain dengan operasi kebalikan.';
- if(q.type==='tf')return 'Periksa setiap bagian pernyataan. Apakah ada satu bagian yang tidak sesuai konsep?';
- if(q.type==='short')return 'Temukan kata kunci pada pertanyaan dan tulis jawaban sesingkat mungkin.';
- return 'Baca kembali pertanyaan, cari kata kunci, lalu eliminasi pilihan yang tidak sesuai.';
+ const text=String(q.question||'').trim();
+ const t=text.toLowerCase();
+ const subject=String(q.subject||quizState?.subject||'').toLowerCase();
+ const topic=String(q.topic||q.chapter||'').toLowerCase();
+ const context=(topic+' '+t).toLowerCase();
+
+ // Petunjuk khusus yang ditulis guru selalu menjadi prioritas.
+ if(q.hint&&String(q.hint).trim())return String(q.hint).trim();
+
+ // MATEMATIKA: arahkan siswa memilih strategi, bukan membocorkan hasil.
+ if(subject.includes('matematika')||subject.includes('math')||/bilangan|penjumlahan|pengurangan|perkalian|pembagian|pecahan|keliling|luas/.test(context)){
+  if(/keliling/.test(context))return 'Ingat, keliling adalah jumlah panjang seluruh sisi bangun. Perhatikan bentuk bangunnya, lalu cari ukuran setiap sisi yang diketahui.';
+  if(/luas/.test(context))return 'Luas menunjukkan besar daerah di dalam bangun. Kenali dulu bentuknya, kemudian gunakan rumus yang sesuai dan tuliskan satuan persegi.';
+  if(/nilai tempat|ratusan|puluhan|satuan|bentuk panjang/.test(context))return 'Perhatikan posisi angka dari kanan: satuan, puluhan, lalu ratusan. Nilai angka ditentukan oleh tempatnya, bukan hanya bentuk angkanya.';
+  if(/urut|banding|lebih besar|lebih kecil/.test(context))return 'Bandingkan angka dari tempat terbesar terlebih dahulu. Mulai dari ratusan, kemudian puluhan, dan terakhir satuan.';
+  if(/perkalian|\\b×\\b| dikali | kali /.test(context))return 'Perkalian dapat dipahami sebagai penjumlahan berulang. Kelompokkan bilangan sesuai soal, lalu gunakan tabel perkalian atau pecah menjadi bagian yang lebih mudah.';
+  if(/pembagian|\\b÷\\b| dibagi | membagikan|sama banyak/.test(context))return 'Pembagian berarti membagi menjadi kelompok yang sama banyak. Tanyakan: ada berapa kelompok dan berapa isi setiap kelompok? Periksa dengan perkalian.';
+  if(/pengurangan|\\b−\\b|\\s-\\s|tersisa|selisih|berkurang/.test(context))return 'Cari jumlah awal, lalu tentukan bagian yang diambil atau selisihnya. Susun pengurangan dengan satuan, puluhan, dan ratusan pada tempat yang sejajar.';
+  if(/penjumlahan|\\s\\+\\s|jumlah seluruh|semuanya|bertambah|mendapat lagi/.test(context))return 'Tentukan bilangan yang digabungkan. Jumlahkan mulai dari satuan, lanjutkan ke puluhan dan ratusan. Perhatikan jika ada angka simpanan.';
+  if(/[0-9]/.test(t))return 'Lingkari angka-angka penting pada soal. Tentukan apa yang diketahui dan apa yang ditanyakan, lalu pilih operasi yang sesuai sebelum menghitung.';
+  return 'Baca kembali angka dan informasi pada soal. Tuliskan apa yang diketahui, apa yang ditanyakan, lalu pilih cara hitung yang sesuai.';
+ }
+
+ // BAHASA INDONESIA: petunjuk berdasarkan keterampilan berbahasa.
+ if(subject.includes('bahasa indonesia')||subject.includes('indonesia')){
+  if(/gagasan utama|ide pokok|pokok pikiran/.test(context))return 'Baca seluruh paragraf. Cari hal yang paling banyak dibicarakan; kalimat lain biasanya memberi contoh atau penjelasan tentang hal tersebut.';
+  if(/tanda baca|tanda tanya|tanda titik|tanda seru/.test(context))return 'Perhatikan maksud kalimatnya: apakah memberi informasi, menanyakan sesuatu, atau menyampaikan seruan/perintah? Pilih tanda baca sesuai maksud itu.';
+  if(/huruf kapital|huruf besar|nama orang|nama tempat/.test(context))return 'Periksa awal kalimat serta kata yang merupakan nama orang atau tempat. Bagian-bagian itu perlu diperhatikan saat menggunakan huruf kapital.';
+  if(/sinonim|persamaan kata/.test(context))return 'Cari kata yang maknanya paling dekat. Coba ganti kata tersebut dalam kalimat; apakah makna kalimat tetap sama?';
+  if(/antonim|lawan kata/.test(context))return 'Pikirkan makna yang berlawanan dengan kata tersebut. Gunakan konteks kalimat untuk memastikan pilihanmu tepat.';
+  if(/urutan|petunjuk|pertama|kemudian|setelah itu/.test(context))return 'Perhatikan kata penanda urutan seperti pertama, kemudian, setelah itu, dan terakhir. Susun kegiatan sesuai urutan yang disebutkan.';
+  if(/kalimat santun|sopan|pendapat|menanggapi/.test(context))return 'Pilih kalimat yang menghargai lawan bicara. Perhatikan penggunaan kata tolong, maaf, terima kasih, serta cara menyampaikan perbedaan pendapat.';
+  if(/bacalah|paragraf|cerita|tokoh/.test(context))return 'Temukan informasi yang disebutkan langsung dalam bacaan. Perhatikan siapa tokohnya, apa yang dilakukan, dan alasan atau akibat yang diceritakan.';
+  return 'Baca kalimat dengan teliti. Perhatikan kata kunci dan maksud kalimat, lalu cocokkan pilihan dengan informasi yang ada pada soal.';
+ }
+
+ // IPAS / IPA: arahkan pada fungsi, ciri, proses, dan hubungan sebab-akibat.
+ if(subject.includes('ipas')||subject.includes('ipa')||subject.includes('sains')){
+  if(/pancaindra|indra|melihat|mendengar|mencium|mengecap|merasakan/.test(context))return 'Ingat kembali lima pancaindra dan tugas masing-masing. Tanyakan bagian tubuh mana yang menerima rangsangan pada situasi di soal.';
+  if(/organ|jantung|paru-paru|pernapasan|peredaran darah/.test(context))return 'Hubungkan nama organ dengan tugas utamanya. Pikirkan apa yang dilakukan organ itu agar tubuh dapat bekerja dengan baik.';
+  if(/siklus hidup|daur hidup|metamorf|telur|ulat|kepompong/.test(context))return 'Pikirkan perubahan makhluk hidup sejak awal hingga dewasa. Susun tahap-tahapnya sesuai urutan pertumbuhan, bukan berdasarkan ukuran.';
+  if(/tumbuhan|akar|batang|daun|bunga/.test(context))return 'Ingat fungsi setiap bagian tumbuhan. Perhatikan apakah soal menanyakan bagian yang menyerap air, menopang, membuat makanan, atau berkembang biak.';
+  if(/interaksi sosial|bekerja sama|menghargai|berteman|tolong-menolong/.test(context))return 'Bayangkan situasi sehari-hari bersama teman. Pilih tindakan yang menunjukkan komunikasi baik, saling menghargai, dan kerja sama.';
+  if(/lingkungan|hewan|makhluk hidup|habitat/.test(context))return 'Perhatikan kebutuhan makhluk hidup dan tempat tinggalnya. Hubungkan ciri yang disebutkan dalam soal dengan fungsi atau lingkungan yang sesuai.';
+  return 'Cari konsep IPAS yang sedang ditanyakan. Perhatikan ciri, fungsi, urutan proses, atau hubungan sebab-akibat yang muncul pada soal.';
+ }
+
+ // PENDIDIKAN PANCASILA.
+ if(subject.includes('pancasila')){
+  if(/sila|lambang|pancasila/.test(context))return 'Ingat urutan lima sila Pancasila beserta lambangnya. Cocokkan makna yang disebutkan pada soal dengan lambang yang tepat.';
+  if(/hak|kewajiban|aturan|tanggung jawab/.test(context))return 'Bedakan hak (sesuatu yang kita terima) dan kewajiban (sesuatu yang harus kita lakukan). Perhatikan situasi yang diceritakan.';
+  if(/musyawarah|pendapat|keputusan/.test(context))return 'Pikirkan cara mengambil keputusan bersama: setiap orang mendapat kesempatan berbicara, saling mendengarkan, lalu mencari kesepakatan.';
+  if(/keberagaman|budaya|bahasa daerah|suku/.test(context))return 'Ingat bahwa perbedaan merupakan kekayaan. Pilih sikap yang menghormati teman dan tidak mengejek perbedaan.';
+  return 'Hubungkan pertanyaan dengan nilai Pancasila dalam kehidupan sehari-hari. Pilih tindakan yang adil, bertanggung jawab, dan menghargai orang lain.';
+ }
+
+ // BAHASA INGGRIS.
+ if(subject.includes('inggris')||subject.includes('english')){
+  if(/meaning|arti|translate|means/.test(context))return 'Perhatikan kata yang ditanyakan dan konteks kalimatnya. Coba ingat kosakata yang sudah dipelajari dan kelompok katanya, misalnya benda, hewan, warna, atau kegiatan.';
+  if(/greeting|hello|good morning|how are you/.test(context))return 'Perhatikan kapan ungkapan digunakan: saat bertemu, berpisah, atau menanyakan kabar.';
+  return 'Cari kata kunci dalam kalimat. Perhatikan apakah soal menanyakan arti kata, nama benda, warna, angka, atau ungkapan sehari-hari.';
+ }
+
+ // Bentuk soal tetap mendapat petunjuk yang sesuai.
+ if(q.type==='tf')return 'Periksa pernyataan bagian demi bagian. Cocokkan dengan konsep yang telah dipelajari; satu informasi yang keliru dapat membuat seluruh pernyataan tidak tepat.';
+ if(q.type==='short')return 'Temukan kata kunci pada pertanyaan. Jawab inti yang diminta dengan kata atau kalimat singkat, lalu periksa kembali ejaannya.';
+ if(q.type==='match')return 'Baca semua pasangan terlebih dahulu. Cari hubungan yang paling jelas antara istilah dan arti, fungsi, contoh, atau keterangannya.';
+ if(q.type==='order')return 'Cari langkah yang harus dilakukan paling awal dan yang menjadi hasil akhir. Gunakan petunjuk waktu atau urutan dalam setiap pernyataan.';
+ if(q.type==='multi')return 'Setiap pilihan harus diperiksa satu per satu. Pilih semua pernyataan yang benar berdasarkan materi, bukan hanya pilihan yang tampak paling cocok.';
+ if(q.explanation&&q.explanation!=='Pembahasan belum ditambahkan.')return 'Petunjuk: fokus pada konsep yang sedang diuji. Setelah menjawab, baca pembahasan untuk melihat alasan dan langkah penyelesaiannya.';
+ return 'Baca kembali pertanyaan, cari kata kunci, lalu periksa setiap pilihan dengan mengingat materi yang sudah dipelajari.';
 }
 function tutorPanel(){
  const name=studentProfile.name||'Pelajar';
