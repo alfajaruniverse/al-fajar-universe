@@ -3538,8 +3538,21 @@ function tutorHint(q){
   if(/sinonim|persamaan kata/.test(context))return 'Cari kata yang maknanya paling dekat. Coba ganti kata tersebut dalam kalimat; apakah makna kalimat tetap sama?';
   if(/antonim|lawan kata/.test(context))return 'Pikirkan makna yang berlawanan dengan kata tersebut. Gunakan konteks kalimat untuk memastikan pilihanmu tepat.';
   if(/urutan|petunjuk|pertama|kemudian|setelah itu/.test(context))return 'Perhatikan kata penanda urutan seperti pertama, kemudian, setelah itu, dan terakhir. Susun kegiatan sesuai urutan yang disebutkan.';
-  if(/kalimat santun|sopan|pendapat|menanggapi/.test(context))return 'Pilih kalimat yang menghargai lawan bicara. Perhatikan penggunaan kata tolong, maaf, terima kasih, serta cara menyampaikan perbedaan pendapat.';
+  // Petunjuk berdasarkan tujuan komunikasi yang ditanyakan.
+  if(/meminta bantuan|minta bantuan|memohon bantuan|meminta tolong|minta tolong/.test(context))
+   return 'Saat meminta bantuan, gunakan kata “tolong” dan sampaikan permintaan dengan nada ramah. Hindari kalimat yang memerintah, membentak, atau memaksa. Periksa pilihan: mana yang memakai ungkapan sopan?';
+  if(/mengucapkan terima kasih|berterima kasih|ucapan terima kasih/.test(context))
+   return 'Pilih ungkapan yang menunjukkan rasa menghargai setelah menerima bantuan atau kebaikan. Ungkapan itu biasanya menyebutkan “terima kasih”, bukan menyuruh atau menyalahkan.';
+  if(/meminta maaf|mohon maaf|mengakui kesalahan|permintaan maaf/.test(context))
+   return 'Permintaan maaf yang baik mengakui kesalahan dengan jelas dan menggunakan kata “maaf”. Hindari kalimat yang justru menyalahkan orang lain.';
+  if(/menolak ajakan|menolak dengan sopan|menolak/.test(context))
+   return 'Penolakan yang santun disampaikan dengan kata-kata halus, dapat disertai alasan singkat, dan tidak merendahkan orang yang mengajak.';
+  if(/menyapa|salam|sapaan/.test(context))
+   return 'Pilih sapaan yang ramah dan sesuai dengan orang serta situasinya. Sapaan yang baik tidak mengejek atau memerintah.';
+  if(/kalimat santun|kalimat sopan|berbicara sopan|bahasa santun|sikap santun|sopan|pendapat|menanggapi/.test(context))
+   return 'Kalimat santun memakai kata yang menghargai orang lain, disampaikan dengan ramah, dan tidak memaksa. Periksa apakah kalimat itu meminta, menyarankan, atau justru memerintah dengan kasar.';
   if(/bacalah|paragraf|cerita|tokoh/.test(context))return 'Temukan informasi yang disebutkan langsung dalam bacaan. Perhatikan siapa tokohnya, apa yang dilakukan, dan alasan atau akibat yang diceritakan.';
+  if(/bantuan|tolong|meminta|memohon/.test(context))return 'Pikirkan ungkapan yang biasa digunakan saat meminta pertolongan dengan baik. Kata “tolong” dan nada ramah membantu menunjukkan kesantunan.';
   return 'Baca kalimat dengan teliti. Perhatikan kata kunci dan maksud kalimat, lalu cocokkan pilihan dengan informasi yang ada pada soal.';
  }
 
